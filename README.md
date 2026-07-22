@@ -47,10 +47,12 @@ fedconformal-clinical/
 │   ├── evaluate.py       # coverage, set size, size/feature-stratified coverage, Beta band
 │   ├── federated.py      # NumPy FedAvg + centralized baseline (logistic model)
 │   ├── heterogeneity.py  # label shift, missingness, JS divergence, domain-classifier AUC
+│   ├── eda.py            # input-data exploration: target classes, feature dictionary, plots
 │   └── viz.py            # all workshop figures (colorblind-safe, fixed site colors)
-├── notebooks/            # 4 executed teaching notebooks (see below)
+├── notebooks/            # 5 executed teaching notebooks (see below)
 ├── scripts/
 │   ├── run_demo.py       # end-to-end pipeline -> writes every figure to figures/
+│   ├── run_eda.py        # input-data exploration -> writes figures/eda/
 │   └── build_notebooks.py# regenerate the notebooks from the package API
 ├── tests/test_conformal.py  # correctness checks (coverage == 1 - alpha)
 ├── data/                 # bundled 4-site CSV + provenance
@@ -61,6 +63,7 @@ fedconformal-clinical/
 
 | # | Notebook | You learn to… |
 |---|----------|---------------|
+| 00 | `00_input_data_exploration.ipynb` | **Start here.** Meet the two target classes (disease / no disease), the 13-feature data dictionary, feature-vs-outcome plots, and correlation structure. |
 | 01 | `01_site_heterogeneity.ipynb` | Measure site heterogeneity; separate **true shift** from **measurement-induced** heterogeneity (Switzerland's unrecorded cholesterol); read a domain-classifier AUC as a covariate-shift alarm. |
 | 02 | `02_conformal_basics.ipynb` | Build split-conformal prediction sets in five lines; verify coverage == 1 − α; compare LAC vs APS. |
 | 03 | `03_federated_training.ipynb` | Train a shared model with FedAvg without pooling data; hold a site out; compare to a centralized baseline. |

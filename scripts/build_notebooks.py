@@ -16,7 +16,7 @@ BOOT = (
     "import sys, os\n"
     "sys.path.insert(0, os.path.abspath(os.path.join('..', 'src')))\n"
     "import numpy as np, pandas as pd\n"
-    "from fedconformal import data, conformal, evaluate as ev, federated, heterogeneity as het, viz\n"
+    "from fedconformal import data, conformal, evaluate as ev, federated, heterogeneity as het, viz, eda\n"
     "viz.set_style()\n"
     "%matplotlib inline\n"
     "# load the federation once (each notebook is self-contained)\n"
@@ -262,5 +262,68 @@ nb04 = nb([
        "What did you have to assume to do it (hint: you needed labelled data *at* Switzerland)?"),
 ])
 write("04_conformal_under_site_shift.ipynb", nb04)
+
+# ---------------------------------------------------------------------------
+# 00 - Input data exploration (run this FIRST)
+# ---------------------------------------------------------------------------
+nb00 = nb([
+    md("# 00 · Getting to know the input data\n"
+       "**Run this notebook first.** Before any modeling we look at the raw inputs: "
+       "what we predict, what the features mean, how they relate to the outcome, and how "
+       "all of that varies across the four hospital sites."),
+    code(BOOT),
+    md("## The dataset in one glance\n"
+       "920 patients from four hospitals, 13 clinical features, one outcome. Each row is one "
+       "patient's cardiac work-up."),
+    code("print('patients:', len(df))\n"
+         "print('sites   :', df['site'].unique().tolist())\n"
+         "print('columns :', [c for c in df.columns if c != 'site'])\n"
+         "df.head()"),
+    md("## What are the classes? (the target)\n"
+       "The **original** UCI target is 0 = no disease and 1–4 = disease of increasing "
+       "severity (number of major vessels with >50% narrowing). The standard task — and this "
+       "bundled mirror — collapse it to a **binary** label: `0 = no disease`, `1 = disease`.\n\n"
+       "So there are **two classes**: *No disease* and *Disease*."),
+    code("print('raw target values present:', sorted(df['target'].unique()))\n"
+         "print('binary class counts:')\n"
+         "print((df['target'] > 0).map({False:'No disease', True:'Disease'}).value_counts())\n"
+         "eda.plot_target_distribution(df);"),
+    md("The cohort is close to balanced (~45% no disease / ~55% disease) — but that overall "
+       "balance is misleading, because it differs a lot by site:"),
+    code("eda.plot_target_by_site(df);"),
+    md("## The 13 features\n"
+       "Five are **continuous** (age, resting blood pressure, cholesterol, max heart rate, ST "
+       "depression) and eight are **categorical / ordinal** (sex, chest-pain type, fasting blood "
+       "sugar, resting ECG, exercise angina, ST slope, #vessels, thalassemia test). The full data "
+       "dictionary is in the `eda` module docstring:"),
+    code("print(eda.__doc__)"),
+    md("### Continuous features by outcome\n"
+       "Where the orange (disease) and blue (no-disease) curves separate, the feature is "
+       "informative. Note `chol`, `trestbps`, `thalach` are shown for *measured* values only "
+       "(zeros are unrecorded)."),
+    code("eda.plot_continuous_grid(df);"),
+    md("### Categorical features: disease rate per level\n"
+       "Bar height is the disease rate within each category; the dashed line is the overall rate. "
+       "Asymptomatic chest pain, exercise-induced angina, a flat/down ST slope and a reversible "
+       "thalassemia defect all carry sharply higher disease rates — clinically sensible."),
+    code("eda.plot_categorical_grid(df);"),
+    md("> **Curation note:** the `0` bars under `slope` and `thal` are *unrecorded* values coded "
+       "as zero (thal is only 3/6/7 in the real coding). Spotting these is exactly the "
+       "measurement-heterogeneity check the workshop is about."),
+    md("### One feature across sites\n"
+       "Maximum heart rate achieved, by site — a quick look at how the same measurement shifts "
+       "between hospitals."),
+    code("eda.plot_feature_boxplots_by_site(df, 'thalach');"),
+    md("### Correlation structure\n"
+       "How features move together and with the outcome. `cp`, `exang`, `oldpeak`, `thalach` and "
+       "`ca` are among the strongest correlates of disease."),
+    code("eda.plot_correlation_heatmap(df);"),
+    md("### Exercise\n"
+       "1. Call `eda.plot_feature_boxplots_by_site(df, 'age')` and `'trestbps'`. Which feature is "
+       "most consistent across sites, and which is most shifted?\n"
+       "2. Using `df`, compute the disease rate for males vs females *within each site*. Does the "
+       "sex effect look the same everywhere? (This previews the heterogeneity notebook.)"),
+])
+write("00_input_data_exploration.ipynb", nb00)
 
 print("\nAll notebooks built.")

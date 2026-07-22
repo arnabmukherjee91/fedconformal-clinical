@@ -16,5 +16,10 @@ env/
 # OS
 .DS_Store
 
+# Transfer / scratch artifacts (from the desktop bridge; safe to remove)
+_to_delete/
+_deliver.zip
+_extract/
+
 # Notebook execution scratch (keep committed figures in figures/)
 *.npy
