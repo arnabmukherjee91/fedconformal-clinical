@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Env
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+
+# Notebook execution scratch (keep committed figures in figures/)
+*.npy
