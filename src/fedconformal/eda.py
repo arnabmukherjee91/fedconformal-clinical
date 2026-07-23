@@ -22,9 +22,13 @@ exang     : exercise-induced angina (1 = yes)                (binary)
 oldpeak   : ST depression induced by exercise                (continuous)
 slope     : slope of peak exercise ST segment --
             1 upsloping, 2 flat, 3 downsloping               (categorical)
-ca        : # major vessels (0-3) colored by fluoroscopy     (ordinal)
-thal      : 3 normal, 6 fixed defect, 7 reversible defect    (categorical)
-target    : 0 = no disease; 1-4 = disease, increasing        (label; binarized to >0)
+ca        : # major vessels (0-3) colored by fluoroscopy;
+            mostly unrecorded (NaN) outside Cleveland         (ordinal)
+thal      : 3 normal, 6 fixed defect, 7 reversible defect;
+            mostly unrecorded (NaN) outside Cleveland         (categorical)
+target    : 0 = no disease; 1-4 = disease, increasing
+            severity (label; this workshop's default task
+            predicts all 5 classes)
 """
 
 from __future__ import annotations
@@ -35,9 +39,14 @@ import matplotlib.pyplot as plt
 from .data import SITES, SITE_LABELS
 from .viz import (set_style, SITE_COLORS, INK, INK_2, MUTED, _save)
 
-# Two-class colors for the outcome (kept distinct from the site colors).
-TARGET_COLORS = {0: "#2a78d6", 1: "#eb6834"}      # no disease / disease
-TARGET_NAMES = {0: "No disease", 1: "Disease"}
+#: The 5 severity classes of the disease target, and a sequential palette
+#: (light -> dark) so "more severe" reads as "darker" in every plot.
+SEVERITY_NAMES = ["No disease", "Mild", "Moderate", "Severe", "Critical"]
+SEVERITY_COLORS = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]
+
+# Two-class colors, used only for the derived "any disease" summary view.
+TARGET_COLORS = {0: "#2a78d6", 1: "#eb6834"}      # no disease / any disease
+TARGET_NAMES = {0: "No disease", 1: "Any disease"}
 
 CONTINUOUS = ["age", "trestbps", "chol", "thalach", "oldpeak"]
 CATEGORICAL = ["sex", "cp", "fbs", "restecg", "exang", "slope", "ca", "thal"]
@@ -59,33 +68,24 @@ CATEGORY_LABELS = {
 # ----------------------------------------------------------------------------
 
 def plot_target_distribution(df, save=None):
-    """Target overview.
-
-    The ORIGINAL UCI target is 0 (no disease) or 1-4 (increasing severity). The
-    standard task -- and this bundled mirror -- collapse it to a *binary* label:
-    0 = no disease, 1 = disease (any severity). We show the binary class balance,
-    and, if the raw multi-class labels happen to be present, their breakdown too.
-    """
+    """Target overview: the full 5-class severity breakdown, plus the derived
+    binary "any disease" collapse for a quick summary stat."""
     set_style()
     raw = df["target"].value_counts().sort_index()
-    multiclass = raw.index.max() > 1     # True only if 1-4 severity survived
 
-    if multiclass:
-        fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
-        grad = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]
-        axes[0].bar(raw.index.astype(int), raw.values,
-                    color=[grad[min(int(k), 4)] for k in raw.index], width=0.7)
-        for k, v in zip(raw.index.astype(int), raw.values):
-            axes[0].text(k, v + 3, str(int(v)), ha="center", va="bottom",
-                         fontsize=10, color=INK_2)
-        axes[0].set_title("Original target: severity 0 (none) … 4 (severe)")
-        axes[0].set_xlabel("target (num)")
-        axes[0].set_ylabel("patients")
-        axes[0].set_xticks([0, 1, 2, 3, 4])
-        ax = axes[1]
-    else:
-        fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+    axes[0].bar(raw.index.astype(int), raw.values,
+                color=[SEVERITY_COLORS[min(int(k), 4)] for k in raw.index], width=0.7)
+    for k, v in zip(raw.index.astype(int), raw.values):
+        axes[0].text(k, v + 3, str(int(v)), ha="center", va="bottom",
+                     fontsize=10, color=INK_2)
+    axes[0].set_title("The target: severity 0 (none) … 4 (critical)")
+    axes[0].set_xlabel("target (num)")
+    axes[0].set_ylabel("patients")
+    axes[0].set_xticks([0, 1, 2, 3, 4])
+    axes[0].set_xticklabels(SEVERITY_NAMES, rotation=15, ha="right")
 
+    ax = axes[1]
     binv = (df["target"] > 0).astype(int).value_counts().sort_index()
     total = binv.values.sum()
     ax.bar([TARGET_NAMES[i] for i in binv.index], binv.values,
@@ -93,35 +93,43 @@ def plot_target_distribution(df, save=None):
     for i, v in zip(range(len(binv)), binv.values):
         ax.text(i, v + 3, f"{v}  ({v/total:.0%})", ha="center", va="bottom",
                 fontsize=10, color=INK_2)
-    ax.set_title("Binary task: disease vs. no disease")
+    ax.set_title("Derived summary: any disease vs. none")
     ax.set_ylabel("patients")
 
-    fig.suptitle("What are we predicting? The heart-disease target",
+    fig.suptitle("What are we predicting? The heart-disease severity target",
                  fontsize=14, fontweight="bold", y=1.02)
     fig.tight_layout()
     return _save(fig, save)
 
 
 def plot_target_by_site(df, save=None):
-    """Stacked bars: disease vs no-disease composition within each site."""
+    """Stacked bars: full 5-class severity composition within each site."""
     set_style()
-    fig, ax = plt.subplots(figsize=(8.4, 4.4))
-    neg, pos = [], []
-    for s in SITES:
-        sub = df[df["site"] == s]["target"] > 0
-        neg.append(int((~sub).sum()))
-        pos.append(int(sub.sum()))
+    fig, ax = plt.subplots(figsize=(8.8, 4.6))
     x = np.arange(len(SITES))
-    ax.bar(x, neg, color=TARGET_COLORS[0], label=TARGET_NAMES[0], width=0.62)
-    ax.bar(x, pos, bottom=neg, color=TARGET_COLORS[1], label=TARGET_NAMES[1], width=0.62)
-    for i, (n, p) in enumerate(zip(neg, pos)):
-        ax.text(i, n + p + 4, f"{p/(n+p):.0%} disease", ha="center", va="bottom",
+    counts = {k: [] for k in range(5)}
+    totals = []
+    for s in SITES:
+        sub = df[df["site"] == s]["target"]
+        totals.append(len(sub))
+        for k in range(5):
+            counts[k].append(int((sub == k).sum()))
+
+    bottom = np.zeros(len(SITES))
+    for k in range(5):
+        vals = np.array(counts[k])
+        ax.bar(x, vals, bottom=bottom, color=SEVERITY_COLORS[k],
+               label=SEVERITY_NAMES[k], width=0.62)
+        bottom += vals
+    for i, (s, tot) in enumerate(zip(SITES, totals)):
+        prev = 1 - counts[0][i] / tot
+        ax.text(i, tot + 4, f"{prev:.0%} any disease", ha="center", va="bottom",
                 fontsize=9, color=INK_2)
     ax.set_xticks(x)
     ax.set_xticklabels([s.capitalize() for s in SITES], rotation=15, ha="right")
     ax.set_ylabel("patients")
-    ax.set_title("Class balance differs by site (label shift)")
-    ax.legend()
+    ax.set_title("Severity composition differs sharply by site (label shift)")
+    ax.legend(ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.16), fontsize=8)
     fig.tight_layout()
     return _save(fig, save)
 
@@ -131,25 +139,27 @@ def plot_target_by_site(df, save=None):
 # ----------------------------------------------------------------------------
 
 def plot_continuous_grid(df, save=None):
-    """Histograms of the continuous features, split by outcome class."""
+    """Histograms of the continuous features, split by severity class."""
     set_style()
     n = len(CONTINUOUS)
     fig, axes = plt.subplots(2, 3, figsize=(12, 7))
     axes = axes.ravel()
-    y = (df["target"] > 0).astype(int)
+    y = df["target"].astype(int)
     for ax, feat in zip(axes, CONTINUOUS):
         v = df[feat]
         measured = v > 0 if feat in ("chol", "trestbps", "thalach") else np.ones(len(v), bool)
-        for cls in (0, 1):
+        for cls in range(5):
             mask = (y == cls) & measured
-            ax.hist(df.loc[mask, feat], bins=22, density=True, histtype="step",
-                    lw=2, color=TARGET_COLORS[cls], label=TARGET_NAMES[cls])
+            if mask.sum() < 2:
+                continue
+            ax.hist(df.loc[mask, feat], bins=18, density=True, histtype="step",
+                    lw=1.8, color=SEVERITY_COLORS[cls], label=SEVERITY_NAMES[cls])
         ax.set_title(feat)
         ax.set_yticks([])
-    axes[0].legend(fontsize=9)
+    axes[0].legend(fontsize=7)
     for ax in axes[n:]:
         ax.axis("off")
-    fig.suptitle("Continuous features by outcome (measured values only)",
+    fig.suptitle("Continuous features by severity class (measured values only)",
                  fontsize=14, fontweight="bold", y=1.01)
     fig.tight_layout()
     return _save(fig, save)
@@ -164,7 +174,7 @@ def plot_feature_boxplots_by_site(df, feature="thalach", save=None):
         v = df[df["site"] == s][feature]
         if feature in ("chol", "trestbps", "thalach"):
             v = v[v > 0]
-        data.append(v.values)
+        data.append(v.dropna().values)
     bp = ax.boxplot(data, patch_artist=True, widths=0.55,
                     medianprops=dict(color=INK, lw=1.6),
                     flierprops=dict(marker="o", markersize=3, alpha=0.4))
@@ -183,12 +193,12 @@ def plot_feature_boxplots_by_site(df, feature="thalach", save=None):
 # ----------------------------------------------------------------------------
 
 def plot_categorical_grid(df, save=None):
-    """Grid of categorical features: disease rate within each category level."""
+    """Grid of categorical features: mean disease severity within each level."""
     set_style()
     feats = ["cp", "sex", "exang", "slope", "restecg", "thal"]
     fig, axes = plt.subplots(2, 3, figsize=(12, 7))
     axes = axes.ravel()
-    y = (df["target"] > 0).astype(int)
+    y = df["target"].astype(float)
     for ax, feat in zip(axes, feats):
         levels = sorted(df[feat].dropna().unique())
         counts, rates, labels = [], [], []
@@ -202,18 +212,18 @@ def plot_categorical_grid(df, save=None):
                 if float(lv).is_integer() else str(lv)
             labels.append(lab)
         xs = np.arange(len(labels))
-        # bar height = disease rate, color intensity by disease rate
-        bars = ax.bar(xs, rates, color=TARGET_COLORS[1], width=0.66, alpha=0.85)
+        colors = [SEVERITY_COLORS[min(int(round(r)), 4)] for r in rates]
+        bars = ax.bar(xs, rates, color=colors, width=0.66, alpha=0.9)
         for xi, r, c in zip(xs, rates, counts):
-            ax.text(xi, r + 0.02, f"{r:.0%}\nn={c}", ha="center", va="bottom",
+            ax.text(xi, r + 0.05, f"{r:.2f}\nn={c}", ha="center", va="bottom",
                     fontsize=8, color=INK_2)
         ax.axhline(y.mean(), ls="--", lw=1, color=MUTED)
         ax.set_xticks(xs)
         ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=9)
-        ax.set_ylim(0, 1.12)
+        ax.set_ylim(0, 4.6)
         ax.set_title(feat)
-        ax.set_ylabel("disease rate")
-    fig.suptitle("Categorical features: disease rate per level (dashed = overall rate)",
+        ax.set_ylabel("mean severity (0-4)")
+    fig.suptitle("Categorical features: mean severity per level (dashed = overall mean)",
                  fontsize=14, fontweight="bold", y=1.01)
     fig.tight_layout()
     return _save(fig, save)
@@ -224,11 +234,11 @@ def plot_categorical_grid(df, save=None):
 # ----------------------------------------------------------------------------
 
 def plot_correlation_heatmap(df, save=None):
-    """Pearson correlation among features + binary target."""
+    """Pearson correlation among features + the 5-class severity target."""
     set_style()
     from .data import FEATURES
     d = df[FEATURES].copy()
-    d["disease"] = (df["target"] > 0).astype(int)
+    d["target"] = df["target"].astype(int)
     corr = d.corr(numeric_only=True)
     fig, ax = plt.subplots(figsize=(8.5, 7))
     im = ax.imshow(corr.to_numpy(), cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
@@ -243,7 +253,7 @@ def plot_correlation_heatmap(df, save=None):
                 ax.text(j, i, f"{val:.2f}", ha="center", va="center",
                         fontsize=7, color="white" if abs(val) > 0.6 else INK)
     ax.grid(False)
-    ax.set_title("Feature correlation (with binary disease target)")
+    ax.set_title("Feature correlation (with the 5-class severity target)")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Pearson r")
     fig.tight_layout()
     return _save(fig, save)

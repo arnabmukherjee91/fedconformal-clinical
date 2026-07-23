@@ -41,7 +41,9 @@ from .data import FEATURES, SITES
 # ----------------------------------------------------------------------------
 
 def label_shift_table(df: pd.DataFrame) -> pd.DataFrame:
-    """Per-site disease prevalence P(y>0) -- the simplest form of shift."""
+    """Per-site prevalence of *any* disease, P(target > 0) -- the simplest form
+    of shift. Meaningful regardless of whether the target is used as binary or
+    kept as the full 5-class severity label."""
     rows = []
     for s in SITES:
         sub = df[df["site"] == s]
@@ -51,22 +53,30 @@ def label_shift_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def missingness_report(df: pd.DataFrame, unrecorded_value=0,
-                       features=("chol", "trestbps", "thalach")) -> pd.DataFrame:
-    """Fraction of physiologically-implausible zeros per feature/site.
+                       zero_sentinel_features=("chol", "trestbps", "thalach"),
+                       nan_features=("ca", "thal")) -> pd.DataFrame:
+    """Fraction of "unrecorded" values per feature/site, from two sources.
 
-    A value of exactly 0 for cholesterol, resting blood pressure or maximum
-    heart rate is not a real measurement -- it is the fingerprint of an
-    *unrecorded* value. (We deliberately exclude features whose zero is clinically
-    valid, e.g. ``oldpeak`` = 0 means a flat ST segment, not a missing value.)
-    A feature that is 100% "unrecorded" at one site (Switzerland cholesterol) is
-    the canonical measurement-induced heterogeneity.
+    Two different missingness fingerprints show up in this dataset:
+
+    * ``zero_sentinel_features`` -- cholesterol, resting blood pressure and max
+      heart rate are physiologically implausible at exactly 0; the source files
+      code "not recorded" this way. (We deliberately exclude features whose
+      zero is clinically valid, e.g. ``oldpeak`` = 0 means a flat ST segment.)
+      Switzerland's cholesterol (100% unrecorded) is the canonical example.
+    * ``nan_features`` -- ``ca`` (# vessels by fluoroscopy) and ``thal``
+      (thallium stress test) are coded ``?``/``-9`` (true NaN after loading)
+      in the raw files, and are missing for the large majority of patients at
+      every site except Cleveland -- an even starker measurement-induced gap.
     """
     rows = []
     for s in SITES:
         sub = df[df["site"] == s]
         row = {"site": s}
-        for f in features:
+        for f in zero_sentinel_features:
             row[f] = float((sub[f] == unrecorded_value).mean())
+        for f in nan_features:
+            row[f] = float(sub[f].isna().mean())
         rows.append(row)
     return pd.DataFrame(rows).set_index("site")
 

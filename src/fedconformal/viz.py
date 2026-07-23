@@ -106,7 +106,7 @@ def plot_site_overview(summary_df, save=None):
     for i, v in enumerate(summary_df["prevalence"]):
         axes[1].text(i, v + 0.02, f"{v:.0%}", ha="center", va="bottom",
                      fontsize=10, color=INK_2)
-    axes[1].set_title("Disease prevalence  P(y = 1)  — true label shift")
+    axes[1].set_title("Disease prevalence  P(y > 0)  — true label shift")
     axes[1].set_ylabel("prevalence")
     axes[1].set_ylim(0, 1.05)
 
@@ -135,7 +135,7 @@ def plot_missingness(miss_df, save=None):
             ax.text(j, i, f"{val:.0%}", ha="center", va="center",
                     color="white" if val > 0.5 else INK_2, fontsize=10)
     ax.grid(False)
-    ax.set_title("Measurement-induced heterogeneity:\nfraction of unrecorded (zero) values")
+    ax.set_title("Measurement-induced heterogeneity:\nfraction of unrecorded values per feature")
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_label("fraction unrecorded", color=INK_2)
     fig.tight_layout()
@@ -309,24 +309,98 @@ def plot_transfer_matrix(cov_matrix_df, alpha, save=None):
 # 5. Set-size distribution (adaptivity)
 # ----------------------------------------------------------------------------
 
-def plot_set_size_distribution(sizes_by_site, save=None):
-    """Grouped bars of prediction-set-size frequencies per site (binary task: 0,1,2)."""
+def plot_set_size_distribution(sizes_by_site, n_classes=2, save=None):
+    """Grouped bars of prediction-set-size frequencies per site.
+
+    Works for any number of classes: set sizes range 0..K. For the binary task
+    (K=2) sizes are labelled empty / singleton / both.
+    """
     set_style()
-    fig, ax = plt.subplots(figsize=(8.4, 4.4))
-    sizes = [0, 1, 2]
-    width = 0.2
-    for k, s in enumerate(SITES):
-        if s not in sizes_by_site:
-            continue
+    fig, ax = plt.subplots(figsize=(9, 4.4))
+    max_size = max(int(np.max(np.asarray(a))) for a in sizes_by_site.values() if len(a))
+    max_size = max(max_size, n_classes)
+    sizes = list(range(0, max_size + 1))
+    width = 0.8 / max(len(SITES), 1)
+    present = [s for s in SITES if s in sizes_by_site]
+    for k, s in enumerate(present):
         arr = np.asarray(sizes_by_site[s])
         freqs = [np.mean(arr == sz) for sz in sizes]
-        ax.bar(np.array(sizes) + (k - 1.5) * width, freqs, width=width,
-               color=SITE_COLORS[s], label=s.capitalize())
+        ax.bar(np.array(sizes) + (k - (len(present) - 1) / 2) * width, freqs,
+               width=width, color=SITE_COLORS[s], label=s.capitalize())
     ax.set_xticks(sizes)
-    ax.set_xticklabels(["∅ (size 0)", "singleton (size 1)", "both labels (size 2)"])
+    if n_classes == 2:
+        ax.set_xticklabels(["∅", "singleton", "both"][: len(sizes)] +
+                           [str(z) for z in sizes[3:]])
+    else:
+        ax.set_xticklabels([str(z) for z in sizes])
+    ax.set_xlabel("prediction-set size  |C(x)|")
     ax.set_ylabel("fraction of patients")
     ax.set_title("Prediction-set size distribution by site (adaptivity)")
     ax.legend()
+    fig.tight_layout()
+    return _save(fig, save)
+
+
+# Sequential-ish class palette for multiclass targets (fixed order).
+CLASS_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#4a3aa7", "#e34948"]
+
+
+def plot_class_distribution_by_site(dist_df, save=None, title=None):
+    """Stacked horizontal bars of per-site class fractions (label shift).
+
+    ``dist_df`` : rows = site, cols = class names, values = fractions (from
+    ``data.class_distribution``).
+    """
+    set_style()
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    sites = list(dist_df.index)
+    classes = list(dist_df.columns)
+    left = np.zeros(len(sites))
+    for j, cls in enumerate(classes):
+        vals = dist_df[cls].to_numpy()
+        color = CLASS_COLORS[j % len(CLASS_COLORS)]
+        ax.barh(range(len(sites)), vals, left=left, color=color, label=cls,
+                height=0.62)
+        for i, (v, l) in enumerate(zip(vals, left)):
+            if v > 0.06:
+                ax.text(l + v / 2, i, f"{v:.0%}", ha="center", va="center",
+                        color="white", fontsize=8)
+        left += vals
+    ax.set_yticks(range(len(sites)))
+    ax.set_yticklabels([s.capitalize() for s in sites])
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("fraction of patients")
+    ax.grid(False)
+    ax.set_title(title or "Class distribution by site (label shift)")
+    ax.legend(ncol=len(classes), loc="upper center", bbox_to_anchor=(0.5, -0.12),
+              fontsize=9)
+    fig.tight_layout()
+    return _save(fig, save)
+
+
+def plot_class_conditional_coverage(cc_by_class, alpha, class_names=None, save=None):
+    """Bar chart of coverage within each true class (class-conditional coverage).
+
+    ``cc_by_class`` : dict {class_index: coverage}.
+    """
+    set_style()
+    target = 1 - alpha
+    ks = sorted(cc_by_class.keys())
+    covs = [cc_by_class[k] for k in ks]
+    labels = [class_names[k] if class_names else str(k) for k in ks]
+    colors = [GOOD if c >= target - 0.05 else CRITICAL for c in covs]
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.bar(range(len(ks)), covs, color=colors, width=0.62, zorder=3)
+    ax.axhline(target, color=INK, lw=1.6, zorder=2, label=f"target 1−α = {target:.0%}")
+    for i, c in enumerate(covs):
+        ax.text(i, c + 0.015, f"{c:.0%}", ha="center", va="bottom",
+                fontsize=10, color=INK_2)
+    ax.set_xticks(range(len(ks)))
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("coverage within true class")
+    ax.set_title("Class-conditional coverage")
+    ax.legend(loc="lower left", fontsize=9)
     fig.tight_layout()
     return _save(fig, save)
 

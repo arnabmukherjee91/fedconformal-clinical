@@ -25,8 +25,8 @@ each maps onto the conformal + federated story.
 
 ### 1. UCI Heart Disease (bundled here) ⭐ primary
 - **Sites:** Cleveland, Hungary, Switzerland, V.A. Long Beach (4 hospitals).
-- **Size:** 920 patients, 13 features, binary disease target.
-- **Access:** fully open, no registration. Bundled in `data/raw/`.
+- **Size:** 920 patients, 13 features, 5-class disease-severity target (0 none … 4 critical).
+- **Access:** fully open, no registration. Bundled in `data/` (original per-site UCI files).
 - **Why it fits:** naturally federated; exhibits *both* kinds of site heterogeneity
   the workshop distinguishes. Small enough to train + calibrate live.
 - **Get the pristine originals:** `pip install ucimlrepo` →

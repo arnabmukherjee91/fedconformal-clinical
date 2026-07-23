@@ -78,6 +78,27 @@ def feature_stratified_coverage(
     return out
 
 
+def class_conditional_coverage(sets: list[np.ndarray], labels: np.ndarray,
+                               n_classes: int | None = None) -> dict:
+    """Coverage within each true class (Section 4.2, class-balanced coverage).
+
+    Returns {class_index: {"n":, "coverage":}}. For a good multiclass conformal
+    procedure this should be >= 1-alpha for every class; rare classes are where
+    it tends to break.
+    """
+    labels = np.asarray(labels)
+    covered = per_point_covered(sets, labels)
+    K = n_classes or int(labels.max() + 1)
+    out = {}
+    for c in range(K):
+        mask = labels == c
+        out[c] = {
+            "n": int(mask.sum()),
+            "coverage": float(covered[mask].mean()) if mask.any() else float("nan"),
+        }
+    return out
+
+
 def coverage_beta_interval(n_cal: int, alpha: float, level: float = 0.95) -> tuple[float, float]:
     """Central `level` interval of the coverage distribution for a given n_cal.
 
