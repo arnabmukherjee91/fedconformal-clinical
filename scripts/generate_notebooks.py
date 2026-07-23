@@ -346,11 +346,19 @@ nb05 = nb([
     md("# 05 · Recreating the figures from the paper\n"
        "The `paper_figures` module reproduces the explanatory diagrams from "
        "Angelopoulos & Bates (2022) as clean, editable Matplotlib figures — ready for "
-       "slides. The two classification illustrations use the same 5-class severity target "
+       "slides. The classification illustrations use the same 5-class severity target "
        "(0 = none … 4 = critical) that notebooks 00–04 actually predict, so the multiclass "
        "picture here matches the workshop's main task, not just a toy example; the regression "
        "illustrations use small synthetic examples, exactly as the paper does."),
     code(BOOT),
+    md("## Figure 1 — Prediction set examples\n"
+       "Unlike every other figure in this notebook, Figure 1 is **not** illustrative: it trains "
+       "the real federated model, calibrates a real APS conformal predictor, and picks three real "
+       "patients — all truly *No disease* — whose prediction sets grow from a confident singleton "
+       "to a 4-class set in which *No disease* is not even the model's top guess. That mirrors the "
+       "paper's own fox-squirrel panel, where the third photo fools the classifier into ranking "
+       "*marmot* above the true class, yet the true class still survives inside the set."),
+    code("pf.fig01_prediction_set_examples();"),
     md("## Figure 2 — Illustration of conformal prediction\n"
        "Compute a score on a holdout point → take the quantile q̂ → form the prediction set "
        "for a new point by keeping every class with softmax ≥ 1 − q̂."),

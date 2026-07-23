@@ -3,7 +3,8 @@
 ## Source files
 
 The four hospital sites are loaded directly from the **original UCI Heart
-Disease** per-site files (Detrano et al., 1989; UCI ML Repository ID 45), not
+Disease** per-site files (Detrano et al., 1989; UCI ML Repository ID 45
+— [dataset page](https://archive.ics.uci.edu/dataset/45/heart+disease)), not
 from a pre-cleaned mirror:
 
 | Site | Institution | File | Rows |
@@ -59,6 +60,8 @@ University Hospital Basel, and the V.A. Medical Center Long Beach & Cleveland
 Clinic Foundation (principal investigator: Robert Detrano). Distributed for
 research use. Please cite the UCI repository and Detrano et al. (1989) if you
 use it.
+
+**Dataset link:** https://archive.ics.uci.edu/dataset/45/heart+disease
 
 The other files in this directory (`cleveland.data`, `hungarian.data`,
 `switzerland.data`, `long-beach-va.data`, `new.data`, `cleve.mod`, `bak`,

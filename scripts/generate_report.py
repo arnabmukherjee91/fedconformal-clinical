@@ -180,7 +180,7 @@ run.font.color.rgb = INK
 sub2 = doc.add_paragraph()
 sub2.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = sub2.add_run("A technical report and workshop companion for the fedconformal-clinical toolkit\n"
-                   "UCI Heart Disease federation · 4 hospitals · 920 patients · 35 figures")
+                   "UCI Heart Disease federation · 4 hospitals · 920 patients · 33 figures")
 run.font.size = Pt(11.5)
 run.italic = True
 run.font.color.rgb = MUTED
@@ -235,7 +235,7 @@ add_para(doc,
     "conformal-prediction library, and a battery of diagnostics that separate genuine population "
     "differences (\"this hospital really does see sicker patients\") from measurement artefacts "
     "(\"this hospital simply never recorded this lab value\"). Every figure the pipeline produces -- "
-    "35 in total -- is reproduced here with a plain-language explanation of what it shows and why it "
+    "33 in total -- is reproduced here with a plain-language explanation of what it shows and why it "
     "matters, alongside the mathematics behind the method and an honest assessment of what is solid "
     "and what could still be added.")
 add_para(doc,
@@ -577,54 +577,28 @@ add_image(doc, "04_js_divergence.png",
     "heterogeneity.js_divergence_matrix.")
 
 add_para(doc,
-    "The domain-classifier number is convincing but abstract. Two scatterplots make the same finding "
-    "directly visible -- something no figure in the original pipeline provided, so both were added "
-    "specifically for this report.")
-
-add_image(doc, "extra/x01_pca_scatter.png",
-    "Figure 5.7 (new) -- Every patient's 13 standardized clinical features compressed to two "
-    "principal components and colored by site. Even in just two dimensions -- a small fraction of "
-    "the original information -- Switzerland (green) forms a visually distinct lower cluster and "
-    "Cleveland (blue) skews toward the upper right; the clouds are not on top of each other. This is "
-    "the geometric picture behind the domain-classifier AUC numbers in Table 5.4. Produced by the "
-    "newly added viz.plot_pca_scatter, via scripts/run_supplementary_figures.py.")
-
-add_para(doc,
-    "The PCA view above compresses all 13 features at once; the next scatterplot instead picks two "
-    "features a clinician would recognize, to show the same separability in familiar clinical units "
-    "rather than abstract components.")
-add_image(doc, "extra/x02_age_thalach_scatter.png",
-    "Figure 5.8 (new) -- Age vs. maximum heart rate achieved, colored by site. The downward trend "
-    "(older patients reach a lower max heart rate) holds at every hospital -- the underlying "
-    "physiology is universal -- but the V.A. and Switzerland clouds sit measurably lower than "
-    "Cleveland's for the same age, and Hungary's patients skew younger overall. Same biology, "
-    "shifted measurement range: precisely the 'interoperable but not identical' picture this dataset "
-    "is valuable for. Produced by the newly added viz.plot_age_thalach_scatter, via "
-    "scripts/run_supplementary_figures.py.")
-
-add_para(doc,
-    "Having established that sites differ (Figures 5.5-5.8), the next four figures return to the "
+    "Having established that sites differ (Figures 5.5-5.6), the next four figures return to the "
     "underlying input data itself and ask which individual features actually drive that difference "
     "and which ones drive the disease-severity prediction task.")
 add_image(doc, "eda/e03_continuous_grid.png",
-    "Figure 5.9 -- All five continuous features, split by severity class. Where the five severity "
+    "Figure 5.7 -- All five continuous features, split by severity class. Where the five severity "
     "curves separate, that feature is informative for the model; where they overlap, it is not. "
     "Produced by eda.plot_continuous_grid.")
 
 add_para(doc,
-    "Max heart rate stood out in Figure 5.9 as one of the more separated features by severity; the "
-    "box plots below isolate it by site instead, for a cleaner read on the shift than the scatter in "
-    "Figure 5.8 alone provides.")
+    "Max heart rate stood out in Figure 5.7 as one of the more separated features by severity; the "
+    "box plots below isolate it by site instead, for a cleaner, single-feature read on how its "
+    "distribution shifts across hospitals.")
 add_image(doc, "eda/e04_thalach_by_site.png",
-    "Figure 5.10 -- Max heart rate distribution by site as box plots -- the same shift visible in "
-    "Figure 5.8, without the age dimension. Produced by eda.plot_feature_boxplots_by_site.")
+    "Figure 5.8 -- Max heart rate distribution by site as box plots. Produced by "
+    "eda.plot_feature_boxplots_by_site.")
 
 add_para(doc,
     "The continuous features above are only half the picture; the categorical and ordinal clinical "
     "variables (chest-pain type, exercise angina, ST slope, thalassemia result, and others) carry at "
     "least as much signal.")
 add_image(doc, "eda/e05_categorical_grid.png",
-    "Figure 5.11 -- Mean severity within each level of six categorical features (chest-pain type, "
+    "Figure 5.9 -- Mean severity within each level of six categorical features (chest-pain type, "
     "sex, exercise angina, ST slope, resting ECG, thalassemia result). Asymptomatic chest pain, "
     "exercise-induced angina, a flat/down ST slope and a reversible thalassemia defect all carry "
     "substantially higher mean severity -- clinically sensible relationships the model can exploit, "
@@ -633,9 +607,9 @@ add_image(doc, "eda/e05_categorical_grid.png",
 
 add_para(doc,
     "Finally, viewing every feature relationship at once as a correlation matrix confirms nothing in "
-    "Figures 5.9-5.11 is contradicted by the pairwise structure of the data.")
+    "Figures 5.7-5.9 is contradicted by the pairwise structure of the data.")
 add_image(doc, "eda/e06_correlation.png",
-    "Figure 5.12 -- Pearson correlation among all 13 features and the 5-class severity target. "
+    "Figure 5.10 -- Pearson correlation among all 13 features and the 5-class severity target. "
     "Chest-pain type, exercise angina, ST depression, max heart rate and vessel count are the "
     "strongest correlates of severity. Produced by eda.plot_correlation_heatmap.")
 
@@ -648,7 +622,7 @@ add_para(doc,
     "particular target.")
 
 add_image(doc, "cp/c01_class_distribution.png",
-    "Figure 5.13 -- Chest-pain-type distribution by site, the secondary-task analogue of Figure 5.4. "
+    "Figure 5.11 -- Chest-pain-type distribution by site, the secondary-task analogue of Figure 5.4. "
     "Hungary is heavy on atypical angina; Switzerland is roughly 80% asymptomatic. Produced by "
     "viz.plot_class_distribution_by_site, via scripts/run_chest_pain_pipeline.py.")
 
@@ -666,7 +640,7 @@ add_bullets(doc, [
     "Open, credential-free, and citable, for the historical reasons explained in Section 4 -- no "
     "data-use agreement stands between a workshop attendee and running the code themselves.",
     "The finding replicates on a second, independently chosen prediction task on the same sites "
-    "(Figure 5.13), which is evidence the heterogeneity is a property of the hospitals, not an "
+    "(Figure 5.11), which is evidence the heterogeneity is a property of the hospitals, not an "
     "artefact of the modeling choice.",
 ])
 
@@ -893,6 +867,26 @@ add_para(doc,
     "corresponds to, and then says precisely which file and which function in the toolkit implements "
     "it and which figure it produces. Everything here is implemented in plain NumPy -- no black-box "
     "library -- specifically so every step can be read line by line.")
+add_para(doc,
+    "Before any of that, it helps to see the destination first -- what a prediction set actually "
+    "looks like -- exactly the role Figure 1 plays at the start of the source paper, before its own "
+    "Section 2 explains the method formally.")
+
+add_image(doc, "paper/fig01_prediction_set_examples.png",
+    "Figure 8.1 -- Three real patients from this project's own data, all truly \"No disease,\" and "
+    "the prediction set the calibrated model actually returns for each. Unlike every other figure in "
+    "this section, this one is not illustrative: it trains the real federated model, calibrates a "
+    "real APS conformal predictor (alpha = 0.10), and searches the held-out test patients for the "
+    "most confident correctly-covered singleton, a representative 3-class case, and the least "
+    "confident correctly-covered 4-class case -- all restricted to patients whose true label is "
+    "\"No disease,\" the only one of the five severity classes for which a full 1-4 spread of "
+    "covered set sizes exists. In the hardest case the model's own top guess is \"Severe,\" not the "
+    "true \"No disease\" -- the true class is fourth, not first -- yet it still survives inside the "
+    "set, which is the entire point of the coverage guarantee: it protects the true answer even when "
+    "the model itself is confidently pointing elsewhere. This is a direct, non-illustrative echo of "
+    "the source paper's own Figure 1, where a third fox-squirrel photograph fools the classifier into "
+    "ranking \"marmot\" first. Produced by paper_figures.fig01_prediction_set_examples, via "
+    "scripts/run_paper_figure_recreations.py.")
 
 add_heading(doc, "8.1 The one assumption everything rests on: exchangeability", level=2)
 add_para(doc,
@@ -965,7 +959,7 @@ add_para(doc,
     "Implementation: conformal.aps_scores and conformal.APSPredictor.")
 
 add_image(doc, "paper/fig02_conformal_illustration.png",
-    "Figure 8.1 -- The method end to end, worked through visually on a 5-class example. Panel 1: "
+    "Figure 8.2 -- The method end to end, worked through visually on a 5-class example. Panel 1: "
     "compute the score on one calibration point (how far the model's probability on the true class "
     "fell short of 1). Panel 2: histogram the scores across the whole calibration set and mark the "
     "quantile q̂. Panel 3: for a brand-new patient, keep every class whose predicted probability "
@@ -974,10 +968,10 @@ add_image(doc, "paper/fig02_conformal_illustration.png",
     "the same 5-class severity framing used throughout this report).")
 
 add_para(doc,
-    "Figure 8.1 showed the LAC score end to end; the same three-step recipe applies to APS, with the "
+    "Figure 8.2 showed the LAC score end to end; the same three-step recipe applies to APS, with the "
     "sorting-and-accumulating mechanic shown separately below.")
 add_image(doc, "paper/fig04_adaptive_prediction_sets.png",
-    "Figure 8.2 -- The APS mechanic specifically: sort classes by predicted probability (left), "
+    "Figure 8.3 -- The APS mechanic specifically: sort classes by predicted probability (left), "
     "accumulate that probability (right) until the running total crosses q̂, and the classes up "
     "to that point form the set. Produced by paper_figures.fig04_aps_illustration (Figure 4).")
 
@@ -985,7 +979,7 @@ add_para(doc,
     "Both illustrations above use synthetic scores chosen to make the mechanic legible; the histogram "
     "below is the real LAC calibration-score distribution from this project's federated model.")
 add_image(doc, "07_calibration_scores.png",
-    "Figure 8.3 -- The actual calibration-score histogram from this project's data (not a synthetic "
+    "Figure 8.4 -- The actual calibration-score histogram from this project's data (not a synthetic "
     "illustration): LAC scores from a model trained across Cleveland, Hungary and the V.A., "
     "calibrated on a held-out pool. The red line is q̂ -- everything to its left calibrates the "
     "90% target. Produced by viz.plot_calibration_scores inside scripts/run_end_to_end_pipeline.py.")
@@ -1008,17 +1002,17 @@ add_para(doc,
     "evaluate.coverage_beta_interval, plotted analytically by viz.plot_coverage_beta.")
 
 add_image(doc, "11_coverage_beta.png",
-    "Figure 8.4 -- The Beta distribution of coverage at three calibration-set sizes (50, 150, 1000). "
+    "Figure 8.5 -- The Beta distribution of coverage at three calibration-set sizes (50, 150, 1000). "
     "The smaller the calibration set, the wider and more uncertain the true coverage really is around "
     "the 90% target -- context for judging whether an observed drop is a real site effect or just "
     "noise. Produced by viz.plot_coverage_beta.")
 
 add_para(doc,
-    "Figure 8.4 used calibration sizes matched to this project's actual sites (50-1,000 patients); "
+    "Figure 8.5 used calibration sizes matched to this project's actual sites (50-1,000 patients); "
     "the recreation below repeats the same idea at the much larger scale used in the original paper, "
     "for comparison.")
 add_image(doc, "paper/fig11_coverage_distribution.png",
-    "Figure 8.5 -- The same idea recreated at the scale used in the original paper (n = 100, 1,000, "
+    "Figure 8.6 -- The same idea recreated at the scale used in the original paper (n = 100, 1,000, "
     "10,000), showing how sharply the distribution narrows as the calibration set grows. Produced by "
     "paper_figures.fig11_coverage_distribution (Figure 11).")
 
@@ -1033,7 +1027,7 @@ add_para(doc,
     "viz.plot_set_size_distribution.")
 
 add_image(doc, "10_set_sizes.png",
-    "Figure 8.6 -- Distribution of prediction-set sizes by site (5-class disease-severity task). "
+    "Figure 8.7 -- Distribution of prediction-set sizes by site (5-class disease-severity task). "
     "Larger sets at a given site mean the model is systematically less certain about patients from "
     "that hospital. Produced by viz.plot_set_size_distribution.")
 
@@ -1049,7 +1043,7 @@ add_para(doc,
     "evaluate.class_conditional_coverage, plotted by viz.plot_class_conditional_coverage.")
 
 add_image(doc, "cp/c04_class_conditional.png",
-    "Figure 8.7 -- Coverage broken out by true chest-pain class. The rare class (typical angina, "
+    "Figure 8.8 -- Coverage broken out by true chest-pain class. The rare class (typical angina, "
     "n = 23) is covered only 26% of the time against a 90% target -- invisible in the pooled 90% "
     "marginal number, and exactly the sub-population a curation pipeline is most likely to serve "
     "under-represented patients in. Produced by viz.plot_class_conditional_coverage inside "
@@ -1069,7 +1063,7 @@ add_para(doc,
     "in Sections 5, 7 or 9.")
 
 add_image(doc, "paper/fig06_conformalized_quantile_regression.png",
-    "Figure 8.8 -- Conformalized quantile regression: a fitted quantile band (dashed) widened by "
+    "Figure 8.9 -- Conformalized quantile regression: a fitted quantile band (dashed) widened by "
     "q̂ (solid) to reach the coverage guarantee. Synthetic illustration. Produced by "
     "paper_figures.fig06_cqr_illustration (Figure 6).")
 
@@ -1078,14 +1072,14 @@ add_para(doc,
     "illustration instead starts from a single point prediction and conformalizes it with a "
     "generic uncertainty scalar.")
 add_image(doc, "paper/fig08_uncertainty_scalar.png",
-    "Figure 8.9 -- A point prediction f(x) with a symmetric conformalized band q̂ · u(x). "
+    "Figure 8.10 -- A point prediction f(x) with a symmetric conformalized band q̂ · u(x). "
     "Synthetic illustration. Produced by paper_figures.fig08_uncertainty_scalar (Figure 8).")
 
 add_para(doc,
     "The final variant swaps a frequentist point prediction for a full Bayesian posterior predictive "
     "density, and takes the prediction set to be the region where that density is highest.")
 add_image(doc, "paper/fig09_conformalized_bayes.png",
-    "Figure 8.10 -- Conformalized Bayes: the prediction set as the superlevel set of a posterior "
+    "Figure 8.11 -- Conformalized Bayes: the prediction set as the superlevel set of a posterior "
     "predictive density. Synthetic illustration. Produced by paper_figures.fig09_bayes_superlevel "
     "(Figure 9).")
 
@@ -1104,25 +1098,25 @@ add_table(doc,
                     "Figs. 5.1, 5.5, 5.6"],
         ["eda.py", "First-look exploratory plots of the raw inputs: target, features, "
                     "correlation structure", "plot_target_distribution, plot_continuous_grid, "
-                    "plot_categorical_grid", "Figs. 5.3, 5.4, 5.9-5.12"],
+                    "plot_categorical_grid", "Figs. 5.3, 5.4, 5.7-5.10"],
         ["federated.py", "A from-scratch FedAvg simulator (binary logistic or softmax model, "
                     "chosen automatically by class count) plus a centralized baseline",
-                    "federated_averaging, train_centralized, make_model", "Figs. 9.2, 9.3"],
+                    "federated_averaging, train_centralized, make_model", "Figs. 9.1, 9.2"],
         ["conformal.py", "The conformal-prediction core: nonconformity scores, the quantile, "
                     "and the two set-valued predictors", "conformal_quantile, lac_scores, "
                     "aps_scores, LACPredictor, APSPredictor",
-                    "Underlies every coverage/set figure (Figs. 7.3, 7.4, 8.1, 8.2, ...)"],
+                    "Underlies every coverage/set figure (Figs. 7.3, 7.4, 8.2, 8.3, ...)"],
         ["evaluate.py", "Every coverage/size metric used to grade a conformal predictor, plus "
                     "the analytic Beta band for judging noise vs. signal", "coverage, "
                     "average_set_size, size_stratified_coverage, class_conditional_coverage, "
-                    "coverage_beta_interval", "Figs. 8.4, 8.6, 8.7"],
+                    "coverage_beta_interval", "Figs. 8.5, 8.7, 8.8"],
         ["viz.py", "All plotting -- one function per figure, a fixed colorblind-safe site "
                     "palette, a shared visual style", "plot_site_overview, "
-                    "plot_coverage_by_site, plot_transfer_matrix, plot_pca_scatter, ...",
+                    "plot_coverage_by_site, plot_transfer_matrix, plot_class_conditional_coverage, ...",
                     "nearly every figure in this report"],
         ["paper_figures.py", "Recreations of the explanatory diagrams from Angelopoulos & Bates "
                     "(2022), for teaching -- synthetic illustrations, not this project's data",
-                    "fig02...fig11", "Figs. 7.2, 8.1, 8.2, 8.5, 8.8-8.10"],
+                    "fig01...fig11", "Figs. 7.2, 8.1, 8.2, 8.3, 8.6, 8.9-8.11"],
     ])
 
 page_break(doc)
@@ -1137,16 +1131,6 @@ add_para(doc,
     "what we would add if this were being extended into a production curation tool rather than a "
     "teaching toolkit.")
 
-add_image(doc, "extra/x03_pipeline_overview.png",
-    "Figure 9.1 (new) -- The five-stage pipeline, module by module. Data flows left to right: raw "
-    "per-site files are loaded and imputed, heterogeneity is measured *before* anything is trained "
-    "(deliberately -- this ordering is the whole point of the workshop's framing), a shared model is "
-    "trained federatively, a conformal predictor is calibrated on top of it, and coverage is graded "
-    "per site rather than pooled. Produced by the newly added viz.plot_pipeline_overview, via "
-    "scripts/run_supplementary_figures.py. No equivalent overview figure existed before this report "
-    "-- it was added because a reader arriving fresh at 35 figures benefits from one picture of how "
-    "they connect.")
-
 add_heading(doc, "9.1 Stage 3: federated training actually converges", level=2)
 add_para(doc,
     "Before conformal calibration means anything, the underlying model has to have actually learned "
@@ -1156,7 +1140,7 @@ add_para(doc,
     "communication round -- no patient-level data ever leaves its hospital.")
 
 add_image(doc, "06_fed_curves.png",
-    "Figure 9.2 -- Per-site training loss across FedAvg communication rounds, 5-class disease task. "
+    "Figure 9.1 -- Per-site training loss across FedAvg communication rounds, 5-class disease task. "
     "All three participating sites' losses fall together, confirming the federated procedure "
     "converges. Produced by viz.plot_fed_learning_curves.")
 
@@ -1164,7 +1148,7 @@ add_para(doc,
     "The same convergence check, repeated on the chest-pain task, confirms FedAvg is not something "
     "that happens to work only for the disease-severity target.")
 add_image(doc, "cp/c02_fed_curves.png",
-    "Figure 9.3 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
+    "Figure 9.2 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
     "behaves consistently across two different targets. Produced by viz.plot_fed_learning_curves, "
     "via scripts/run_chest_pain_pipeline.py.")
 
@@ -1196,7 +1180,7 @@ add_para(doc,
     "function.")
 
 add_image(doc, "compare/task_comparison.png",
-    "Figure 9.4 -- The comparison from Table 9.1, plotted: heterogeneity scores, average prediction-"
+    "Figure 9.3 -- The comparison from Table 9.1, plotted: heterogeneity scores, average prediction-"
     "set size, and worst-case cross-site coverage, disease task vs. chest-pain task, side by side. "
     "Produced by compare_prediction_tasks.plot_comparison.")
 
@@ -1207,7 +1191,7 @@ add_para(doc,
     "than only summarized in Table 9.1.")
 
 add_image(doc, "cp/c05_transfer_matrix.png",
-    "Figure 9.5 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "
+    "Figure 9.4 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "
     "by viz.plot_transfer_matrix, via scripts/run_chest_pain_pipeline.py.")
 
 add_para(doc,
@@ -1215,22 +1199,22 @@ add_para(doc,
     "calibration site at Cleveland specifically -- the same headline framing as Figure 7.3 -- makes "
     "the single-predictor case easier to read directly.")
 add_image(doc, "cp/c06_coverage_by_site.png",
-    "Figure 9.6 -- Coverage of a Cleveland-calibrated chest-pain predictor across all four sites. "
+    "Figure 9.5 -- Coverage of a Cleveland-calibrated chest-pain predictor across all four sites. "
     "Produced by viz.plot_coverage_by_site, via scripts/run_chest_pain_pipeline.py.")
 
 add_para(doc,
     "Coverage alone does not show adaptivity; the set-size distribution below is the chest-pain "
-    "task's analogue of Figure 8.6.")
+    "task's analogue of Figure 8.7.")
 add_image(doc, "cp/c07_set_sizes.png",
-    "Figure 9.7 -- Prediction-set-size distribution by site, chest-pain task. Produced by "
+    "Figure 9.6 -- Prediction-set-size distribution by site, chest-pain task. Produced by "
     "viz.plot_set_size_distribution, via scripts/run_chest_pain_pipeline.py.")
 
 add_para(doc,
     "Rounding out the secondary-task diagnostics, the calibration-score histogram below is the "
-    "chest-pain analogue of Figure 8.3.")
+    "chest-pain analogue of Figure 8.4.")
 add_image(doc, "cp/c03_calibration_scores.png",
-    "Figure 9.8 -- The chest-pain task's own calibration-score histogram, the secondary-task analogue "
-    "of Figure 8.3. Produced by viz.plot_calibration_scores, via scripts/run_chest_pain_pipeline.py.")
+    "Figure 9.7 -- The chest-pain task's own calibration-score histogram, the secondary-task analogue "
+    "of Figure 8.4. Produced by viz.plot_calibration_scores, via scripts/run_chest_pain_pipeline.py.")
 
 add_heading(doc, "9.4 Verdict: is the pipeline right as it stands?", level=2)
 add_para(doc,
@@ -1282,7 +1266,7 @@ page_break(doc)
 # ==========================================================================
 add_heading(doc, "Appendix: Full Figure Index", level=1)
 add_para(doc,
-    "All 35 figures referenced in this report, in file order, with the script or notebook that "
+    "All 33 figures referenced in this report, in file order, with the script or notebook that "
     "generates each one. Every figure is reproducible by running the listed command from the "
     "repository root.")
 
@@ -1292,36 +1276,34 @@ appendix_rows = [
     ("figures/03_chol_distributions.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.2"),
     ("figures/04_js_divergence.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.6"),
     ("figures/05_domain_auc.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.5"),
-    ("figures/06_fed_curves.png", "scripts/run_end_to_end_pipeline.py", "Fig. 9.2"),
-    ("figures/07_calibration_scores.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.3"),
+    ("figures/06_fed_curves.png", "scripts/run_end_to_end_pipeline.py", "Fig. 9.1"),
+    ("figures/07_calibration_scores.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.4"),
     ("figures/08_transfer_matrix.png", "scripts/run_end_to_end_pipeline.py", "Fig. 7.4"),
     ("figures/09_coverage_by_site.png", "scripts/run_end_to_end_pipeline.py", "Fig. 7.3"),
-    ("figures/10_set_sizes.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.6"),
-    ("figures/11_coverage_beta.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.4"),
+    ("figures/10_set_sizes.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.7"),
+    ("figures/11_coverage_beta.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.5"),
     ("figures/eda/e01_target_distribution.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.3"),
     ("figures/eda/e02_target_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.4"),
-    ("figures/eda/e03_continuous_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.9"),
-    ("figures/eda/e04_thalach_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.10"),
-    ("figures/eda/e05_categorical_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.11"),
-    ("figures/eda/e06_correlation.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.12"),
-    ("figures/cp/c01_class_distribution.png", "scripts/run_chest_pain_pipeline.py", "Fig. 5.13"),
-    ("figures/cp/c02_fed_curves.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.3"),
-    ("figures/cp/c03_calibration_scores.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.8"),
-    ("figures/cp/c04_class_conditional.png", "scripts/run_chest_pain_pipeline.py", "Fig. 8.7"),
-    ("figures/cp/c05_transfer_matrix.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.5"),
-    ("figures/cp/c06_coverage_by_site.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.6"),
-    ("figures/cp/c07_set_sizes.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.7"),
-    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.1"),
-    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.2"),
-    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.8"),
-    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.9"),
-    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.10"),
+    ("figures/eda/e03_continuous_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.7"),
+    ("figures/eda/e04_thalach_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.8"),
+    ("figures/eda/e05_categorical_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.9"),
+    ("figures/eda/e06_correlation.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.10"),
+    ("figures/cp/c01_class_distribution.png", "scripts/run_chest_pain_pipeline.py", "Fig. 5.11"),
+    ("figures/cp/c02_fed_curves.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.2"),
+    ("figures/cp/c03_calibration_scores.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.7"),
+    ("figures/cp/c04_class_conditional.png", "scripts/run_chest_pain_pipeline.py", "Fig. 8.8"),
+    ("figures/cp/c05_transfer_matrix.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.4"),
+    ("figures/cp/c06_coverage_by_site.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.5"),
+    ("figures/cp/c07_set_sizes.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.6"),
+    ("figures/paper/fig01_prediction_set_examples.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.1"),
+    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.2"),
+    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.3"),
+    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.9"),
+    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.10"),
+    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.11"),
     ("figures/paper/fig10_coverage_notions.png", "scripts/run_paper_figure_recreations.py", "Fig. 7.2"),
-    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.5"),
-    ("figures/compare/task_comparison.png", "scripts/compare_prediction_tasks.py", "Fig. 9.4"),
-    ("figures/extra/x01_pca_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 5.7"),
-    ("figures/extra/x02_age_thalach_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 5.8"),
-    ("figures/extra/x03_pipeline_overview.png", "scripts/run_supplementary_figures.py (new)", "Fig. 9.1"),
+    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.6"),
+    ("figures/compare/task_comparison.png", "scripts/compare_prediction_tasks.py", "Fig. 9.3"),
 ]
 add_table(doc, ["File", "Generated by", "Referenced as"], appendix_rows)
 
@@ -1330,7 +1312,7 @@ add_para(doc,
     "python scripts/run_chest_pain_pipeline.py && "
     "python scripts/run_exploratory_data_analysis.py && "
     "python scripts/run_paper_figure_recreations.py && "
-    "python scripts/compare_prediction_tasks.py && python scripts/run_supplementary_figures.py",
+    "python scripts/compare_prediction_tasks.py",
     italic=True, size=9.5, color=MUTED)
 
 # ---- Save --------------------------------------------------------------

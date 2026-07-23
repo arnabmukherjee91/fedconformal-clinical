@@ -37,7 +37,7 @@ every difference this toolkit measures a genuine site effect rather than an
 artifact of how a demo was constructed.
 
 **Status:** 10/10 automated correctness tests passing · all 8 notebooks execute
-end-to-end with zero errors · 35 figures, every one reproducible from a single
+end-to-end with zero errors · 32 figures, every one reproducible from a single
 script call · a 30+ page written report (below) walking through the full method,
 math, and results.
 
@@ -66,7 +66,7 @@ you can re-run yourself:
 | Finding | Evidence | Where |
 |---|---|---|
 | A model's coverage guarantee can drop **19 points** (90% → 71%) at a site it never saw, while the pooled number still reads 90% | `figures/09_coverage_by_site.png`, `figures/08_transfer_matrix.png` | Notebook 04, `scripts/run_end_to_end_pipeline.py` |
-| The four hospitals are almost perfectly separable from clinical features alone (domain-classifier AUC **0.88–1.00**) — visible directly as separated clusters in a 2-D projection, not just as an abstract score | `figures/05_domain_auc.png`, `figures/extra/x01_pca_scatter.png` | Notebook 01, `scripts/run_supplementary_figures.py` |
+| The four hospitals are almost perfectly separable from clinical features alone (domain-classifier AUC **0.88–1.00**) — a simple cross-validated classifier can guess the hospital from features alone | `figures/05_domain_auc.png` | Notebook 01, `scripts/run_end_to_end_pipeline.py` |
 | A rare class can be almost unprotected (**26% coverage** for the rarest chest-pain type) even while the overall marginal coverage sits right on the 90% target | `figures/cp/c04_class_conditional.png` | Notebook 06, `scripts/run_chest_pain_pipeline.py` |
 | Two clinical variables (`ca`, `thal`) are missing for **80–99% of patients at every hospital except Cleveland** — a measurement gap far larger than the textbook cholesterol example, and easy to miss without explicitly checking | `figures/02_missingness.png` | Notebook 01, `heterogeneity.missingness_report` |
 | The story replicates on an independent second task (predicting chest-pain type instead of disease severity) and a different nonconformity score (APS instead of LAC) | `figures/compare/task_comparison.png` | `scripts/compare_prediction_tasks.py` |
@@ -93,12 +93,11 @@ fedconformal-clinical/
 │   ├── run_exploratory_data_analysis.py# input-data exploration -> writes figures/eda/
 │   ├── run_paper_figure_recreations.py # recreate the paper's figures -> writes figures/paper/
 │   ├── compare_prediction_tasks.py     # head-to-head: 5-class disease vs 4-class chest-pain
-│   ├── run_supplementary_figures.py    # PCA/scatter site-separability views + pipeline diagram
 │   ├── generate_notebooks.py           # regenerate the notebooks from the package API
 │   └── generate_report.py              # regenerate the written report from every figure + result
 ├── tests/                # correctness checks (coverage == 1 - alpha, multiclass, 5-class task)
 ├── data/                 # the 4 original UCI per-site source files + provenance
-├── figures/              # 35 generated PNGs (top-level + eda/, cp/, paper/, compare/, extra/)
+├── figures/              # 32 generated PNGs (top-level + eda/, cp/, paper/, compare/)
 └── report/                # Beyond_Interoperability_Report.docx — the full written report
 ```
 
@@ -146,8 +145,8 @@ pip install -r requirements.txt
 pip install -e .            # optional: install the package
 
 # reproduce every figure (add run_chest_pain_pipeline / run_exploratory_data_analysis /
-# run_paper_figure_recreations / compare_prediction_tasks / run_supplementary_figures
-# for the rest of the figure set — see What's Inside above)
+# run_paper_figure_recreations / compare_prediction_tasks for the rest of the figure
+# set — see What's Inside above)
 python scripts/run_end_to_end_pipeline.py
 
 # run the correctness tests
@@ -167,9 +166,9 @@ bundled under `data/`.
 
 ## A few of the figures
 
-| Site separability (new: PCA scatter) | Measurement heterogeneity | Cross-site coverage transfer | The rare-class blind spot |
+| Site heterogeneity | Measurement heterogeneity | Cross-site coverage transfer | The rare-class blind spot |
 |---|---|---|---|
-| ![](figures/extra/x01_pca_scatter.png) | ![](figures/02_missingness.png) | ![](figures/08_transfer_matrix.png) | ![](figures/cp/c04_class_conditional.png) |
+| ![](figures/01_site_overview.png) | ![](figures/02_missingness.png) | ![](figures/08_transfer_matrix.png) | ![](figures/cp/c04_class_conditional.png) |
 
 ---
 

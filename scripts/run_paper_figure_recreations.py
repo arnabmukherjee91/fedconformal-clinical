@@ -22,6 +22,7 @@ def f(name):
 
 
 def main():
+    pf.fig01_prediction_set_examples(save=f("fig01_prediction_set_examples.png"))
     pf.fig02_conformal_illustration(save=f("fig02_conformal_illustration.png"))
     pf.fig04_aps_illustration(save=f("fig04_adaptive_prediction_sets.png"))
     pf.fig06_cqr_illustration(save=f("fig06_conformalized_quantile_regression.png"))
