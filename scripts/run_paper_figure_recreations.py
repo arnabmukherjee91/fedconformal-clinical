@@ -1,6 +1,6 @@
 """
 Regenerate the recreations of the paper's explanatory figures
-(Angelopoulos & Bates, 2022). Run:  python scripts/run_paper_figures.py
+(Angelopoulos & Bates, 2022). Run:  python scripts/run_paper_figure_recreations.py
 Writes to figures/paper/.
 """
 

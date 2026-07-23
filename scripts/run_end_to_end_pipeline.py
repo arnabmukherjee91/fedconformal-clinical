@@ -1,5 +1,5 @@
 """
-End-to-end workshop demo.
+End-to-end pipeline: data loading through cross-site conformal evaluation.
 
 Runs the full pipeline and writes every figure to ``figures/``:
 
@@ -11,7 +11,7 @@ Runs the full pipeline and writes every figure to ``figures/``:
   5. THE punchline: calibrate at one site, deploy at another -> coverage breaks.
   6. Adaptivity (set sizes) and the calibration-set-size effect.
 
-Run:  python scripts/run_demo.py
+Run:  python scripts/run_end_to_end_pipeline.py
 """
 
 from __future__ import annotations

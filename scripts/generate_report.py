@@ -6,7 +6,7 @@ figure files and does not recompute results (those live in the other scripts
 and notebooks; the numbers quoted in the prose below were read off their
 output and are refreshed by hand if the pipeline numbers change).
 
-Run:  python scripts/build_report.py
+Run:  python scripts/generate_report.py
 Writes: report/Beyond_Interoperability_Report.docx
 """
 
@@ -413,7 +413,7 @@ add_image(doc, "07_calibration_scores.png",
     "Figure 2.3 -- The actual calibration-score histogram from this project's data (not a synthetic "
     "illustration): LAC scores from a model trained across Cleveland, Hungary and the V.A., "
     "calibrated on a held-out pool. The red line is q_hat -- everything to its left calibrates the "
-    "90% target. Produced by viz.plot_calibration_scores inside scripts/run_demo.py.")
+    "90% target. Produced by viz.plot_calibration_scores inside scripts/run_end_to_end_pipeline.py.")
 
 add_heading(doc, "2.4 Why the calibration-set size matters", level=2)
 add_para(doc,
@@ -472,7 +472,7 @@ add_image(doc, "cp/c04_class_conditional.png",
     "n = 23) is covered only 26% of the time against a 90% target -- invisible in the pooled 90% "
     "marginal number, and exactly the sub-population a curation pipeline is most likely to serve "
     "under-represented patients in. Produced by viz.plot_class_conditional_coverage inside "
-    "scripts/run_demo_cp.py.")
+    "scripts/run_chest_pain_pipeline.py.")
 
 add_heading(doc, "2.7 Beyond classification: the same idea generalizes", level=2)
 add_para(doc,
@@ -668,7 +668,7 @@ add_image(doc, "extra/x01_pca_scatter.png",
     "the original information -- Switzerland (green) forms a visually distinct lower cluster and "
     "Cleveland (blue) skews toward the upper right; the clouds are not on top of each other. This is "
     "the geometric picture behind the domain-classifier AUC numbers in Table 3.5. Produced by the "
-    "newly added viz.plot_pca_scatter, via scripts/run_extra_figures.py.")
+    "newly added viz.plot_pca_scatter, via scripts/run_supplementary_figures.py.")
 
 add_image(doc, "extra/x02_age_thalach_scatter.png",
     "Figure 3.8 (new) -- Age vs. maximum heart rate achieved, colored by site. The downward trend "
@@ -677,7 +677,7 @@ add_image(doc, "extra/x02_age_thalach_scatter.png",
     "Cleveland's for the same age, and Hungary's patients skew younger overall. Same biology, "
     "shifted measurement range: precisely the 'interoperable but not identical' picture this dataset "
     "is valuable for. Produced by the newly added viz.plot_age_thalach_scatter, via "
-    "scripts/run_extra_figures.py.")
+    "scripts/run_supplementary_figures.py.")
 
 add_image(doc, "eda/e03_continuous_grid.png",
     "Figure 3.9 -- All five continuous features, split by severity class. Where the five severity "
@@ -712,7 +712,7 @@ add_para(doc,
 add_image(doc, "cp/c01_class_distribution.png",
     "Figure 3.13 -- Chest-pain-type distribution by site, the secondary-task analogue of Figure 3.4. "
     "Hungary is heavy on atypical angina; Switzerland is roughly 80% asymptomatic. Produced by "
-    "viz.plot_class_distribution_by_site, via scripts/run_demo_cp.py.")
+    "viz.plot_class_distribution_by_site, via scripts/run_chest_pain_pipeline.py.")
 
 add_heading(doc, "3.6 Summary: what makes this dataset ideal", level=2)
 add_bullets(doc, [
@@ -750,7 +750,7 @@ add_image(doc, "extra/x03_pipeline_overview.png",
     "(deliberately -- this ordering is the whole point of the workshop's framing), a shared model is "
     "trained federatively, a conformal predictor is calibrated on top of it, and coverage is graded "
     "per site rather than pooled. Produced by the newly added viz.plot_pipeline_overview, via "
-    "scripts/run_extra_figures.py. No equivalent overview figure existed before this report -- it "
+    "scripts/run_supplementary_figures.py. No equivalent overview figure existed before this report -- it "
     "was added because a reader arriving fresh at 33 figures benefits from one picture of how they "
     "connect.")
 
@@ -770,12 +770,12 @@ add_image(doc, "06_fed_curves.png",
 add_image(doc, "cp/c02_fed_curves.png",
     "Figure 4.3 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
     "behaves consistently across two different targets. Produced by viz.plot_fed_learning_curves, "
-    "via scripts/run_demo_cp.py.")
+    "via scripts/run_chest_pain_pipeline.py.")
 
 add_heading(doc, "4.2 Does the story change with a different task and a different score function?", level=2)
 add_para(doc,
     "A natural objection: does the whole story depend on the particular choice of disease-severity "
-    "prediction and the LAC score? scripts/compare_tasks.py runs the identical analysis -- label "
+    "prediction and the LAC score? scripts/compare_prediction_tasks.py runs the identical analysis -- label "
     "shift, covariate shift, cross-site conformal transfer, using the APS score this time -- on both "
     "the 5-class disease task and the 4-class chest-pain task, side by side.")
 add_table(doc,
@@ -801,7 +801,7 @@ add_para(doc,
 add_image(doc, "compare/task_comparison.png",
     "Figure 4.4 -- The comparison from Table 4.1, plotted: heterogeneity scores, average prediction-"
     "set size, and worst-case cross-site coverage, disease task vs. chest-pain task, side by side. "
-    "Produced by compare_tasks.plot_comparison.")
+    "Produced by compare_prediction_tasks.plot_comparison.")
 
 add_heading(doc, "4.3 The secondary task's own conformal pipeline, run in full", level=2)
 add_para(doc,
@@ -811,19 +811,19 @@ add_para(doc,
 
 add_image(doc, "cp/c05_transfer_matrix.png",
     "Figure 4.5 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "
-    "by viz.plot_transfer_matrix, via scripts/run_demo_cp.py.")
+    "by viz.plot_transfer_matrix, via scripts/run_chest_pain_pipeline.py.")
 
 add_image(doc, "cp/c06_coverage_by_site.png",
     "Figure 4.6 -- Coverage of a Cleveland-calibrated chest-pain predictor across all four sites. "
-    "Produced by viz.plot_coverage_by_site, via scripts/run_demo_cp.py.")
+    "Produced by viz.plot_coverage_by_site, via scripts/run_chest_pain_pipeline.py.")
 
 add_image(doc, "cp/c07_set_sizes.png",
     "Figure 4.7 -- Prediction-set-size distribution by site, chest-pain task. Produced by "
-    "viz.plot_set_size_distribution, via scripts/run_demo_cp.py.")
+    "viz.plot_set_size_distribution, via scripts/run_chest_pain_pipeline.py.")
 
 add_image(doc, "cp/c03_calibration_scores.png",
     "Figure 4.8 -- The chest-pain task's own calibration-score histogram, the secondary-task analogue "
-    "of Figure 2.3. Produced by viz.plot_calibration_scores, via scripts/run_demo_cp.py.")
+    "of Figure 2.3. Produced by viz.plot_calibration_scores, via scripts/run_chest_pain_pipeline.py.")
 
 add_heading(doc, "4.4 Verdict: is the pipeline right as it stands?", level=2)
 add_para(doc,
@@ -876,48 +876,48 @@ add_para(doc,
     "repository root.")
 
 appendix_rows = [
-    ("figures/01_site_overview.png", "scripts/run_demo.py", "Fig. 1.1"),
-    ("figures/02_missingness.png", "scripts/run_demo.py", "Fig. 3.1"),
-    ("figures/03_chol_distributions.png", "scripts/run_demo.py", "Fig. 3.2"),
-    ("figures/04_js_divergence.png", "scripts/run_demo.py", "Fig. 3.6"),
-    ("figures/05_domain_auc.png", "scripts/run_demo.py", "Fig. 3.5"),
-    ("figures/06_fed_curves.png", "scripts/run_demo.py", "Fig. 4.2"),
-    ("figures/07_calibration_scores.png", "scripts/run_demo.py", "Fig. 2.3"),
-    ("figures/08_transfer_matrix.png", "scripts/run_demo.py", "Fig. 1.4"),
-    ("figures/09_coverage_by_site.png", "scripts/run_demo.py", "Fig. 1.3"),
-    ("figures/10_set_sizes.png", "scripts/run_demo.py", "Fig. 2.6"),
-    ("figures/11_coverage_beta.png", "scripts/run_demo.py", "Fig. 2.4"),
-    ("figures/eda/e01_target_distribution.png", "scripts/run_eda.py", "Fig. 3.3"),
-    ("figures/eda/e02_target_by_site.png", "scripts/run_eda.py", "Fig. 3.4"),
-    ("figures/eda/e03_continuous_grid.png", "scripts/run_eda.py", "Fig. 3.9"),
-    ("figures/eda/e04_thalach_by_site.png", "scripts/run_eda.py", "Fig. 3.10"),
-    ("figures/eda/e05_categorical_grid.png", "scripts/run_eda.py", "Fig. 3.11"),
-    ("figures/eda/e06_correlation.png", "scripts/run_eda.py", "Fig. 3.12"),
-    ("figures/cp/c01_class_distribution.png", "scripts/run_demo_cp.py", "Fig. 3.13"),
-    ("figures/cp/c02_fed_curves.png", "scripts/run_demo_cp.py", "Fig. 4.3"),
-    ("figures/cp/c03_calibration_scores.png", "scripts/run_demo_cp.py", "Fig. 4.8"),
-    ("figures/cp/c04_class_conditional.png", "scripts/run_demo_cp.py", "Fig. 2.7"),
-    ("figures/cp/c05_transfer_matrix.png", "scripts/run_demo_cp.py", "Fig. 4.5"),
-    ("figures/cp/c06_coverage_by_site.png", "scripts/run_demo_cp.py", "Fig. 4.6"),
-    ("figures/cp/c07_set_sizes.png", "scripts/run_demo_cp.py", "Fig. 4.7"),
-    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figures.py", "Fig. 2.1"),
-    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figures.py", "Fig. 2.2"),
-    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figures.py", "Fig. 2.8"),
-    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figures.py", "Fig. 2.9"),
-    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figures.py", "Fig. 2.10"),
-    ("figures/paper/fig10_coverage_notions.png", "scripts/run_paper_figures.py", "Fig. 1.2"),
-    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figures.py", "Fig. 2.5"),
-    ("figures/compare/task_comparison.png", "scripts/compare_tasks.py", "Fig. 4.4"),
-    ("figures/extra/x01_pca_scatter.png", "scripts/run_extra_figures.py (new)", "Fig. 3.7"),
-    ("figures/extra/x02_age_thalach_scatter.png", "scripts/run_extra_figures.py (new)", "Fig. 3.8"),
-    ("figures/extra/x03_pipeline_overview.png", "scripts/run_extra_figures.py (new)", "Fig. 4.1"),
+    ("figures/01_site_overview.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.1"),
+    ("figures/02_missingness.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.1"),
+    ("figures/03_chol_distributions.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.2"),
+    ("figures/04_js_divergence.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.6"),
+    ("figures/05_domain_auc.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.5"),
+    ("figures/06_fed_curves.png", "scripts/run_end_to_end_pipeline.py", "Fig. 4.2"),
+    ("figures/07_calibration_scores.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.3"),
+    ("figures/08_transfer_matrix.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.4"),
+    ("figures/09_coverage_by_site.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.3"),
+    ("figures/10_set_sizes.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.6"),
+    ("figures/11_coverage_beta.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.4"),
+    ("figures/eda/e01_target_distribution.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.3"),
+    ("figures/eda/e02_target_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.4"),
+    ("figures/eda/e03_continuous_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.9"),
+    ("figures/eda/e04_thalach_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.10"),
+    ("figures/eda/e05_categorical_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.11"),
+    ("figures/eda/e06_correlation.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.12"),
+    ("figures/cp/c01_class_distribution.png", "scripts/run_chest_pain_pipeline.py", "Fig. 3.13"),
+    ("figures/cp/c02_fed_curves.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.3"),
+    ("figures/cp/c03_calibration_scores.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.8"),
+    ("figures/cp/c04_class_conditional.png", "scripts/run_chest_pain_pipeline.py", "Fig. 2.7"),
+    ("figures/cp/c05_transfer_matrix.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.5"),
+    ("figures/cp/c06_coverage_by_site.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.6"),
+    ("figures/cp/c07_set_sizes.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.7"),
+    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.1"),
+    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.2"),
+    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.8"),
+    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.9"),
+    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.10"),
+    ("figures/paper/fig10_coverage_notions.png", "scripts/run_paper_figure_recreations.py", "Fig. 1.2"),
+    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.5"),
+    ("figures/compare/task_comparison.png", "scripts/compare_prediction_tasks.py", "Fig. 4.4"),
+    ("figures/extra/x01_pca_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 3.7"),
+    ("figures/extra/x02_age_thalach_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 3.8"),
+    ("figures/extra/x03_pipeline_overview.png", "scripts/run_supplementary_figures.py (new)", "Fig. 4.1"),
 ]
 add_table(doc, ["File", "Generated by", "Referenced as"], appendix_rows)
 
 add_para(doc,
-    "Reproduce everything: python scripts/run_demo.py && python scripts/run_demo_cp.py && "
-    "python scripts/run_eda.py && python scripts/run_paper_figures.py && "
-    "python scripts/compare_tasks.py && python scripts/run_extra_figures.py",
+    "Reproduce everything: python scripts/run_end_to_end_pipeline.py && python scripts/run_chest_pain_pipeline.py && "
+    "python scripts/run_exploratory_data_analysis.py && python scripts/run_paper_figure_recreations.py && "
+    "python scripts/compare_prediction_tasks.py && python scripts/run_supplementary_figures.py",
     italic=True, size=9.5, color=MUTED)
 
 # ---- Save --------------------------------------------------------------

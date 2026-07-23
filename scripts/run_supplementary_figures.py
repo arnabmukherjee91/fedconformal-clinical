@@ -1,7 +1,8 @@
 """
-Extra diagnostic figures that fill gaps in the original figure set: scatter
-views of site separability (no scatterplot existed before) and a pipeline
-schematic. Written for the workshop write-up. Run: python scripts/run_extra_figures.py
+Supplementary diagnostic figures that fill gaps in the original figure set:
+scatter views of site separability (no scatterplot existed before) and a
+pipeline schematic. Written for the workshop write-up.
+Run: python scripts/run_supplementary_figures.py
 Writes to figures/extra/.
 """
 

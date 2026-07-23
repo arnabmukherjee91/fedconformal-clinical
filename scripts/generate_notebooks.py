@@ -2,7 +2,7 @@
 Generate the workshop Jupyter notebooks programmatically with nbformat.
 
 Keeping the notebooks in a builder script means they stay in sync with the
-package API and are easy to regenerate. Run:  python scripts/build_notebooks.py
+package API and are easy to regenerate. Run:  python scripts/generate_notebooks.py
 """
 
 import os
@@ -457,7 +457,7 @@ nb06 = nb([
        "(Section 4.2 of the paper). Does it lift typical-angina coverage back to 90%, and what "
        "does it cost in average set size?"),
 ])
-write("06_multiclass_cp.ipynb", nb06)
+write("06_chest_pain_multiclass.ipynb", nb06)
 
 # ---------------------------------------------------------------------------
 # Task comparison (descriptively named, not numbered)
@@ -471,11 +471,11 @@ nb_cmp = nb([
        "2. **Which task yields more conformal labels per sample** (larger prediction sets)?\n\n"
        "Each task uses all columns except its own label as features, so the disease model uses the "
        "13 clinical variables (including chest-pain type) and the chest-pain model uses the other 12 "
-       "plus the disease target. The analysis logic lives in `scripts/compare_tasks.py`; we import "
+       "plus the disease target. The analysis logic lives in `scripts/compare_prediction_tasks.py`; we import "
        "and call it here so the notebook stays in sync with the script."),
     code(BOOT + "\n"
          "sys.path.insert(0, os.path.abspath(os.path.join('..', 'scripts')))\n"
-         "import compare_tasks as ct"),
+         "import compare_prediction_tasks as ct"),
     md("## Run the comparison\n"
        "For each task this trains one shared model on all four sites, measures three kinds of "
        "heterogeneity, and computes the average conformal set size (APS, α = 0.1)."),
@@ -512,11 +512,11 @@ nb_cmp = nb([
        "both (worst-case site still ≈ 87-88%) — so here heterogeneity shows up mainly as label "
        "shift, not as a large coverage break."),
     md("### Exercise\n"
-       "1. Re-run with `ALPHA` changed in `compare_tasks.py` (e.g. 0.05). How do the set sizes and the "
+       "1. Re-run with `ALPHA` changed in `compare_prediction_tasks.py` (e.g. 0.05). How do the set sizes and the "
        "verdict move?\n"
        "2. Restrict each task to a *shared* 12-feature set (drop the other task's label from the "
        "features) and re-compute. Does using 'every feature' change which task looks more heterogeneous?"),
 ])
-write("task_comparison_heterogeneity.ipynb", nb_cmp)
+write("07_task_comparison.ipynb", nb_cmp)
 
 print("\nAll notebooks built.")

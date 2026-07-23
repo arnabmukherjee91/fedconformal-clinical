@@ -1,6 +1,6 @@
 """
 Input-data exploration: generate the EDA figures for the raw UCI Heart Disease
-inputs. Run:  python scripts/run_eda.py  ->  writes to figures/eda/
+inputs. Run:  python scripts/run_exploratory_data_analysis.py  ->  writes to figures/eda/
 """
 
 from __future__ import annotations

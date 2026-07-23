@@ -1,12 +1,12 @@
 """
-End-to-end demo for the 4-class CHEST-PAIN-TYPE task.
+End-to-end pipeline for the 4-class chest-pain-type task.
 
 Predict `cp` (1 typical angina / 2 atypical angina / 3 non-anginal / 4
 asymptomatic) from the other 12 clinical features, in the federated multi-site
 setting. This is the natural multiclass showcase for conformal prediction: a
 prediction set is now a set of chest-pain types.
 
-Writes every figure to figures/cp/.  Run:  python scripts/run_demo_cp.py
+Writes every figure to figures/cp/.  Run:  python scripts/run_chest_pain_pipeline.py
 """
 
 from __future__ import annotations

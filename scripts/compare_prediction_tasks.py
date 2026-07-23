@@ -23,7 +23,7 @@ Heterogeneity is measured three complementary ways:
 "Conformal labels per sample" = average prediction-set size |C(x)| under APS at
 the same alpha, reported raw and normalised by the number of classes.
 
-Run:  python scripts/compare_tasks.py   ->  writes figures/compare/
+Run:  python scripts/compare_prediction_tasks.py   ->  writes figures/compare/
 """
 
 from __future__ import annotations
