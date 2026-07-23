@@ -6,6 +6,11 @@ figure files and does not recompute results (those live in the other scripts
 and notebooks; the numbers quoted in the prose below were read off their
 output and are refreshed by hand if the pipeline numbers change).
 
+Structure: Introduction -> Challenges -> Motivation -> The
+Difficulty of Working With Real Clinical Data -> Our Dataset -> Methods of
+Interoperability (standards + recommendation) -> Why Conformal Prediction
+Helps -> The Mathematics -> Pipeline Walkthrough -> Appendix.
+
 Run:  python scripts/generate_report.py
 Writes: report/Beyond_Interoperability_Report.docx
 """
@@ -110,15 +115,30 @@ def add_table(doc, headers, rows, widths=None, header_fill="2A78D6"):
     return table
 
 
-def add_formula(doc, text, size=12.5):
-    """A visually distinct, monospaced 'formula box' (plain-text, not OMML --
-    Word will render it as styled text, not a live equation object)."""
+def add_table_caption(doc, text):
+    add_para(doc, text, bold=True, size=10.5)
+
+
+def add_math(doc, parts, size=13.5):
+    """A formula rendered with real Unicode math symbols (alpha, hats via a
+    combining circumflex, ceiling/floor brackets, sigma, minus/leq signs) and
+    true sub/superscript run formatting in Cambria Math -- as close to a live
+    equation as plain docx runs get without hand-building an OMML object.
+
+    ``parts`` is a list of (text, style) pairs, style in
+    {"normal", "sub", "sup"}, concatenated left to right on one line.
+    """
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(text)
-    run.font.name = "Consolas"
-    run.font.size = Pt(size)
-    run.font.color.rgb = RGBColor(0x1c, 0x5c, 0xab)
+    for text, kind in parts:
+        run = p.add_run(text)
+        run.font.name = "Cambria Math"
+        run.font.size = Pt(size)
+        run.font.color.rgb = RGBColor(0x1c, 0x5c, 0xab)
+        if kind == "sub":
+            run.font.subscript = True
+        elif kind == "sup":
+            run.font.superscript = True
     pPr = p._p.get_or_add_pPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:fill"), "F0F4FA")
@@ -138,7 +158,6 @@ def page_break(doc):
 
 doc = Document()
 
-# Base style
 style = doc.styles["Normal"]
 style.font.name = "Calibri"
 style.font.size = Pt(11)
@@ -161,29 +180,35 @@ run.font.color.rgb = INK
 sub2 = doc.add_paragraph()
 sub2.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = sub2.add_run("A technical report and workshop companion for the fedconformal-clinical toolkit\n"
-                   "UCI Heart Disease federation · 4 hospitals · 920 patients · 33 figures")
+                   "UCI Heart Disease federation · 4 hospitals · 920 patients · 35 figures")
 run.font.size = Pt(11.5)
 run.italic = True
 run.font.color.rgb = MUTED
 
 page_break(doc)
 
-# ---- Table of contents (manual, since this is meant to open directly) --
+# ---- Table of contents ---------------------------------------------------
 add_heading(doc, "Contents", level=1)
 toc_items = [
-    "Executive Summary",
-    "1. Why Conformal Prediction Helps With Site-Level Heterogeneity",
-    "2. The Mathematics, and What Every Piece of Code Produces",
-    "3. Why This Dataset Is an Ideal Testbed for Interoperability",
-    "4. Pipeline Walkthrough and Justification: Is This Enough?",
+    "1. Introduction",
+    "2. Challenges",
+    "3. Motivation",
+    "4. The Difficulty of Working With Real Clinical Data",
+    "5. Our Dataset: The UCI Heart Disease Federation",
+    "6. Methods of Interoperability: Choosing a Standard",
+    "7. Why Conformal Prediction Helps With Site-Level Heterogeneity",
+    "8. The Mathematics, and What Every Piece of Code Produces",
+    "9. Pipeline Walkthrough and Justification: Is This Enough?",
     "Appendix: Full Figure Index",
 ]
 for it in toc_items:
     add_para(doc, it, size=12)
 page_break(doc)
 
-# ---- Executive summary --------------------------------------------------
-add_heading(doc, "Executive Summary", level=1)
+# ==========================================================================
+# SECTION 1 -- INTRODUCTION
+# ==========================================================================
+add_heading(doc, "1. Introduction", level=1)
 add_para(doc,
     "Interoperability means two systems can exchange and read each other's data without a human "
     "translating in between. It says nothing about whether the data means the same thing once it "
@@ -210,337 +235,216 @@ add_para(doc,
     "conformal-prediction library, and a battery of diagnostics that separate genuine population "
     "differences (\"this hospital really does see sicker patients\") from measurement artefacts "
     "(\"this hospital simply never recorded this lab value\"). Every figure the pipeline produces -- "
-    "33 in total -- is reproduced here with a plain-language explanation of what it shows and why it "
+    "35 in total -- is reproduced here with a plain-language explanation of what it shows and why it "
     "matters, alongside the mathematics behind the method and an honest assessment of what is solid "
     "and what could still be added.")
+add_para(doc,
+    "The rest of this report is organized to build the argument from the ground up rather than jump "
+    "straight to results. Section 2 lays out the concrete challenges a cross-institution curation "
+    "pipeline has to solve. Section 3 explains why this is a live, fast-moving problem right now, not "
+    "a settled one. Section 4 confronts a practical reality that most technical write-ups skip over "
+    "entirely: why real multi-institution clinical data is so hard to obtain in the first place, and "
+    "what that implies for anyone trying to build or teach this kind of pipeline. Section 5 introduces "
+    "the specific dataset this toolkit uses and why it is an unusually good fit. Section 6 asks a "
+    "question that is easy to leave implicit: given that interoperability itself is a solved technical "
+    "problem with multiple competing standards, which standard actually fits this use case, and what "
+    "does adopting one buy you (and not buy you)? Sections 7 through 9 then get into the technical "
+    "core -- the method, the mathematics, and a full walkthrough of the pipeline -- and the report "
+    "closes with an honest verdict on what is solid today and what a production deployment should add "
+    "next.")
 
 page_break(doc)
 
 # ==========================================================================
-# SECTION 1
+# SECTION 2 -- CHALLENGES
 # ==========================================================================
-add_heading(doc, "1. Why Conformal Prediction Helps With Site-Level Heterogeneity", level=1)
-
-add_heading(doc, "1.1 The problem: models are confident even when they are wrong", level=2)
+add_heading(doc, "2. Challenges", level=1)
 add_para(doc,
-    "A typical machine-learning classifier reports a number that looks like a probability -- "
-    "\"92% chance this patient has heart disease.\" That number is not actually a probability in "
-    "any guaranteed sense; it is whatever the model happened to output. Nothing forces it to be "
-    "correct 92% of the time. In practice, a model trained on one hospital's patients and then run "
-    "on a different hospital's patients often stays just as confident -- the 92% does not shrink -- "
-    "while its actual correctness rate quietly drops. The model does not know it has left home. This "
-    "is the single most dangerous failure mode in cross-institution deployment: not a model that "
-    "visibly fails, but one that fails silently while sounding just as sure of itself as it did "
-    "during development.")
+    "Before describing the toolkit, it is worth naming the problem precisely. Five distinct "
+    "challenges compound to make cross-institution clinical modeling harder than it looks from the "
+    "outside, and conflating them is one of the easiest ways a curation project goes wrong.")
+
+add_bullets(doc, [
+    "Separating true variation from measurement artefact, with no ground truth. Given a feature "
+    "that differs across two hospitals, there is no automatic way to know whether the underlying "
+    "patients really differ or whether one hospital simply measures that variable differently (or "
+    "not at all). Both look identical in a naive summary statistic; only a deliberate, "
+    "purpose-built diagnostic tells them apart.",
+    "Silent failure. A model's own output gives no warning when it has left the population it was "
+    "trained on. A softmax score of 92% looks the same whether it is well-calibrated or not -- the "
+    "model does not know, and cannot say, that it is now operating somewhere it has never been "
+    "validated.",
+    "Data cannot simply be pooled to fix the first two problems. The obvious fix for heterogeneity "
+    "-- combine everyone's data, retrain, re-validate -- is usually not legally or practically "
+    "available in healthcare (Section 4 explains why in detail). Any solution has to work under the "
+    "constraint that patient-level records stay inside their originating institution.",
+    "A shared schema does not imply shared meaning. Two institutions can adopt the identical data "
+    "standard, the identical column names, the identical value codes, and still encode different "
+    "underlying clinical practices -- which tests get ordered, which values get routinely recorded, "
+    "which patients get referred there in the first place. Standardization (Section 6) narrows this "
+    "gap; it does not close it.",
+    "Standard evaluation metrics do not expose any of this. Accuracy, AUC, and even a well-calibrated "
+    "pooled coverage number are all computed as one number across the whole validation set. Every "
+    "one of them can look healthy while one site, or one patient subgroup, is being served far below "
+    "the reported standard. Finding that requires metrics that are explicitly stratified -- by site, "
+    "by class, by subgroup -- not just a bigger validation set.",
+])
 add_para(doc,
-    "Interoperability standards solve the problem of *getting the data there*. They do nothing to "
-    "solve this problem, because the failure is not about the data format -- it is about whether the "
-    "statistical relationship the model learned at Hospital A still holds at Hospital B. Two "
-    "hospitals can use an identical schema, an identical column called \"cholesterol,\" and still "
-    "have that column mean something different in practice (measured routinely at one site, almost "
-    "never measured at another). A model cannot tell the difference between a hospital with "
-    "genuinely different patients and a hospital with a broken measurement pipeline unless something "
-    "is specifically built to check.")
-
-add_heading(doc, "1.2 What conformal prediction actually does", level=2)
-add_para(doc,
-    "Conformal prediction is a wrapper you can put around *any* trained model -- logistic "
-    "regression, a neural network, anything that outputs a score per class -- that converts its "
-    "raw scores into a set of plausible answers, with a guarantee attached to the size and content "
-    "of that set. Instead of the model saying \"heart disease, severity 2, 92% confident,\" a "
-    "conformal predictor says \"the true severity is somewhere in {1, 2, 3}, and this kind of "
-    "statement is right at least 90% of the time.\" When the model is unsure, the set grows to "
-    "include more possibilities; when it is sure, the set can shrink to a single class. Crucially, "
-    "the 90% figure is not a hope -- it is a mathematical guarantee that holds regardless of whether "
-    "the underlying model is any good, as long as one condition holds: the data you calibrate the "
-    "guarantee on must look statistically like the data you later apply it to.")
-add_para(doc,
-    "That condition -- formally called *exchangeability*, discussed in Section 2 -- is exactly where "
-    "site heterogeneity enters the picture. Calibrating a conformal predictor at one hospital and "
-    "deploying it at another silently assumes the two hospitals are exchangeable. If they are not, "
-    "the 90% promise degrades to whatever the real cross-site agreement supports, and conformal "
-    "prediction becomes a *measuring instrument* for that degradation: you calibrate at one site, "
-    "check the empirical coverage at every other site, and the gap between the promised rate and the "
-    "observed rate is a direct, quantitative readout of how much that pair of sites disagrees. No "
-    "other common technique gives you a single interpretable number for \"how much can I trust this "
-    "model somewhere it hasn't been tested.\"")
-
-add_heading(doc, "1.3 Averages hide the failure -- you have to look per site", level=2)
-add_para(doc,
-    "The single most important lesson in this toolkit is that a pooled, dataset-wide coverage number "
-    "can look perfect while hiding a badly broken subgroup. A conformal predictor calibrated across "
-    "all four hospitals together can report 90% coverage overall while one hospital sits at 70% and "
-    "the others compensate by over-covering. This is exactly what we observe: a model federated over "
-    "Cleveland, Hungary and the V.A., then calibrated using only Cleveland patients and deployed "
-    "everywhere, hits 90-91% coverage at Cleveland, Hungary and the V.A. -- and drops to 71% at "
-    "Switzerland, the hospital the federation never trained on (Figure 1.3). Reported as one pooled "
-    "number, this problem is invisible. Reported per site, it is impossible to miss. That is the "
-    "practical argument for conformal prediction in a curation pipeline: it is cheap to compute, "
-    "attaches to any model you already have, and turns \"is this data comparable across sites\" from "
-    "a qualitative judgment call into a number you can put in a table and set a threshold on.")
-
-add_image(doc, "01_site_overview.png",
-    "Figure 1.1 -- Patients per site and disease prevalence per site. Prevalence swings from "
-    "36% (Hungary) to 94% (Switzerland): a genuine difference in patient population (true "
-    "distributional shift), not a data-entry artefact. Produced by viz.plot_site_overview, called "
-    "from data.summarize_sites.")
-
-add_image(doc, "paper/fig10_coverage_notions.png",
-    "Figure 1.2 -- The distinction this whole report rests on, drawn schematically for two groups. "
-    "Left: no coverage guarantee at all. Middle: 'marginal' coverage -- the overall average looks "
-    "fine (green dots) while one group is quietly failing (concentrated red dots). Right: "
-    "'conditional' coverage -- every group is covered at the target rate individually. Produced by "
-    "paper_figures.fig10_coverage_notions, a recreation of Figure 10 in Angelopoulos & Bates (2022).")
-
-add_image(doc, "09_coverage_by_site.png",
-    "Figure 1.3 -- The headline empirical result. A conformal predictor calibrated only on "
-    "Cleveland data is deployed at all four hospitals. It meets the 90% target at Cleveland, Hungary "
-    "and the V.A., and silently drops to 71% at Switzerland -- well outside the shaded 'benign "
-    "fluctuation' band that captures ordinary sampling noise, meaning this drop is a real effect, "
-    "not chance. Produced by viz.plot_coverage_by_site, using conformal.LACPredictor and "
-    "evaluate.coverage.")
-
-add_image(doc, "08_transfer_matrix.png",
-    "Figure 1.4 -- The full picture: calibrate at the row's hospital, deploy at the column's "
-    "hospital, read off coverage. The diagonal (calibrate and deploy at the same hospital) is "
-    "healthy everywhere. Off-diagonal cells show what happens when a hospital's calibration is "
-    "exported elsewhere -- deploying anything calibrated on Cleveland, Hungary or the V.A. at "
-    "Switzerland lands around 70-72%, while a Switzerland-calibrated predictor over-covers "
-    "everywhere else (its patients are on average sicker, so its threshold is looser than it needs "
-    "to be elsewhere). Produced by viz.plot_transfer_matrix.")
-
-add_para(doc, "Table 1.1 -- Coverage of a Cleveland-calibrated predictor, by deployment site "
-    "(target: 90%, calibration set = 303 Cleveland patients, split-conformal LAC score, alpha = 0.10)",
-    bold=True, size=10.5)
-add_table(doc,
-    ["Deployment site", "Empirical coverage", "Gap vs. 90% target", "Verdict"],
-    [
-        ["Cleveland (same site as calibration)", "90.8%", "+0.8 pp", "Meets target"],
-        ["Hungary", "90.8%", "+0.8 pp", "Meets target"],
-        ["V.A. Long Beach", "90.5%", "+0.5 pp", "Meets target"],
-        ["Switzerland (never seen by the federated model)", "70.7%", "−19.3 pp", "Fails, silently"],
-    ])
-add_para(doc,
-    "This is the practical payoff for a curation pipeline: instead of trusting that a model \"should\" "
-    "generalize because the incoming data is schema-compliant, you get a per-site number that tells "
-    "you exactly where trust breaks down, before a clinician or downstream system relies on it.",
-    italic=True, color=MUTED)
+    "These five challenges are the reason this report is organized the way it is: Section 6 addresses "
+    "the third and fourth (what standardization can and cannot do), and Sections 7 through 9 build and "
+    "demonstrate the diagnostic tooling that addresses the first, second and fifth directly.")
 
 page_break(doc)
 
 # ==========================================================================
-# SECTION 2
+# SECTION 3 -- MOTIVATION
 # ==========================================================================
-add_heading(doc, "2. The Mathematics, and What Every Piece of Code Produces", level=1)
+add_heading(doc, "3. Motivation", level=1)
 add_para(doc,
-    "This section explains the method in plain language first, gives the exact formula each idea "
-    "corresponds to, and then says precisely which file and which function in the toolkit implements "
-    "it and which figure it produces. Everything here is implemented in plain NumPy -- no black-box "
-    "library -- specifically so every step can be read line by line.")
+    "None of the challenges in Section 2 are new in principle. What has changed is that three "
+    "independent trends are accelerating at the same time, and the gap between them is exactly where "
+    "this toolkit sits.")
 
-add_heading(doc, "2.1 The one assumption everything rests on: exchangeability", level=2)
+add_heading(doc, "3.1 Clinical AI is being deployed faster than it is being validated across sites", level=2)
 add_para(doc,
-    "Conformal prediction needs exactly one statistical assumption, and it is weaker than almost "
-    "anything else in statistics: the calibration data and the test data must be *exchangeable* -- "
-    "informally, drawn from the same underlying process, so that shuffling the order of the combined "
-    "set would not tell you anything about which points were 'calibration' and which were 'test'. It "
-    "does not require the data to be Gaussian, linearly separable, or generated by any particular "
-    "model at all. This is what makes conformal prediction so widely applicable -- and it is also "
-    "exactly the assumption that cross-hospital deployment violates. Calibration data from Cleveland "
-    "and test data from Switzerland are not exchangeable if Switzerland patients are drawn from a "
-    "different population (94% disease prevalence vs. Cleveland's 46%). The guarantee below is "
-    "conditional on an assumption that this dataset is specifically built to violate on purpose, so "
-    "that the violation is visible.")
+    "The number of AI- and machine-learning-enabled tools cleared for clinical use has grown "
+    "substantially in recent years, and that growth has outpaced the development of standard practice "
+    "for validating those tools beyond the site (or sites) where they were trained. It is now "
+    "well documented in the clinical-ML literature that models validated at one hospital can "
+    "underperform when deployed at another -- differences in patient case-mix, equipment, and "
+    "measurement practice are enough to degrade performance even when the input schema is identical. "
+    "Regulators have taken notice: evolving FDA guidance on AI/ML-based software as a medical device "
+    "explicitly calls for real-world performance monitoring across sites and subpopulations after "
+    "deployment, not just a single pre-market validation number. That is precisely the per-site, "
+    "per-subgroup accountability this toolkit's diagnostics are built to provide.")
 
-add_heading(doc, "2.2 The nonconformity score and the conformal quantile", level=2)
+add_heading(doc, "3.2 Federated learning has moved from research curiosity to practical necessity", level=2)
 add_para(doc,
-    "Step one: define a single number, the 'nonconformity score,' that measures how surprising a "
-    "true label was, given what the model predicted. A large score means the model's output looked "
-    "nothing like the truth; a small score means the model was basically right. Step two: compute "
-    "this score for every point in a held-out 'calibration' set the model never trained on. Step "
-    "three: take a specific, slightly-inflated quantile of those calibration scores -- inflated just "
-    "enough to make the finite-sample guarantee exact rather than approximate:")
-add_formula(doc, "q_hat  =  the  ceil( (n + 1) x (1 - alpha) ) / n   empirical quantile of the\n"
-                 "          calibration scores  { s_1, ..., s_n }")
+    "Federated learning -- training a shared model by exchanging weights instead of data -- was "
+    "popularized around 2016-17 for keyboard-prediction models on phones, where centralizing personal "
+    "keystroke data was undesirable but not legally prohibitive. In healthcare the same architecture "
+    "has become close to mandatory rather than optional, because (as Section 4 details) centralizing "
+    "patient-level records across institutions is frequently not something a legal and regulatory "
+    "process will approve on any reasonable timeline. The result is a fast-growing body of federated "
+    "clinical-ML research and infrastructure -- multi-hospital consortia, federated benchmark suites "
+    "such as FLamby, and federated extensions of standard toolkits -- all converging on the same "
+    "constraint this report's simulator is built around: train without moving the data.")
+
+add_heading(doc, "3.3 Interoperability is now a regulatory mandate, which raises the stakes on the semantic gap", level=2)
 add_para(doc,
-    "Here n is the number of calibration points and alpha is the error rate you are willing to "
-    "accept (alpha = 0.10 throughout this report, i.e. a 90% target). Step four: for any new patient, "
-    "build the prediction set by keeping every candidate label whose score would not have exceeded "
-    "q_hat:")
-add_formula(doc, "C(x)  =  { y : score(x, y)  <=  q_hat }")
+    "In the United States, the ONC's 21st Century Cures Act Final Rule requires certified health IT "
+    "systems to expose standardized, FHIR-based APIs, and the Trusted Exchange Framework and Common "
+    "Agreement (TEFCA) is actively rolling out a nationwide \"network of networks\" for health "
+    "information exchange. The European Union's proposed European Health Data Space regulation aims "
+    "at a similar cross-border standard. These are genuine, significant achievements -- but they "
+    "mandate *structural* interoperability (can the bytes move, in an agreed format) far more "
+    "directly than *semantic* interoperability (does the moved value mean the same clinical fact "
+    "everywhere). As more institutions become technically interoperable by mandate, the silent "
+    "semantic gap this report measures becomes more consequential, not less: it is now the primary "
+    "remaining barrier standing between \"the data arrived\" and \"the data can be trusted,\" which is "
+    "exactly the subject of Section 6.")
+
+add_heading(doc, "3.4 Trustworthy, auditable uncertainty is a fast-growing requirement of its own", level=2)
 add_para(doc,
-    "This is the entire method. The proof that P(true label in C(x)) >= 1 - alpha is a short "
-    "exchangeability argument (Angelopoulos & Bates, 2022, Section 2) -- the important practical "
-    "point is that it works for *any* nonconformity score and *any* underlying model. "
-    "Implementation: conformal.conformal_quantile(scores, alpha). Both predictors described below "
-    "call it as their calibration step.")
-
-add_heading(doc, "2.3 Two ways to define the score: LAC and APS", level=2)
+    "Alongside interoperability mandates, there is growing regulatory and clinical demand for AI "
+    "systems that can quantify their own uncertainty in a way that can be audited, not just asserted. "
+    "Conformal prediction is one of very few uncertainty-quantification methods that offers a "
+    "distribution-free, finite-sample coverage guarantee -- it does not depend on the underlying model "
+    "being well-specified or Bayesian, which is a large part of why it has seen rapid adoption in "
+    "exactly this kind of high-stakes, regulated setting over the past few years.")
 add_para(doc,
-    "\"LAC\" (Least Ambiguous set-valued Classifier) uses the simplest possible score: one minus the "
-    "model's softmax probability on the true class.")
-add_formula(doc, "s_i  =  1  -  f_hat(x_i)_{y_i}")
+    "Put together: clinical AI deployment, mandated data interoperability, and demand for auditable "
+    "uncertainty are each independently accelerating right now, and the space between the second and "
+    "third trend -- interoperable, but not yet verifiably trustworthy -- is precisely the open problem "
+    "this report and its accompanying toolkit are built to make tractable.")
+
+page_break(doc)
+
+# ==========================================================================
+# SECTION 4 -- THE DIFFICULTY OF WORKING WITH REAL CLINICAL DATA
+# ==========================================================================
+add_heading(doc, "4. The Difficulty of Working With Real Clinical Data", level=1)
 add_para(doc,
-    "A score near 0 means the model put almost all its probability mass on the correct class; a "
-    "score near 1 means the model was confidently wrong. Implementation: conformal.lac_scores and "
-    "conformal.LACPredictor.")
+    "A technical report on cross-site heterogeneity can make the whole problem sound like a pure "
+    "modeling exercise. It is not. The reason so much clinical-ML research relies on the same handful "
+    "of datasets, and the reason multi-institution studies are rarer than single-site ones, is a set "
+    "of real, well-justified legal and ethical barriers that sit upstream of any modeling choice. "
+    "Understanding them is necessary to understand why this workshop's dataset (Section 5) is unusual, "
+    "and why federated learning (Section 3.2) is often not a stylistic preference but the only "
+    "architecture actually available.")
+
+add_heading(doc, "4.1 IRB review and the Common Rule", level=2)
 add_para(doc,
-    "\"APS\" (Adaptive Prediction Sets, Romano, Sesia & Candes, 2020) instead sorts the classes from "
-    "most to least likely and adds up probability mass until it reaches the true class:")
-add_formula(doc, "s_i  =  sum of softmax probabilities for every class ranked\n"
-                 "        at or above the true class y_i, in descending order")
+    "In the United States, essentially any use of data involving human subjects for research -- "
+    "including a purely retrospective, secondary analysis of existing clinical records -- falls under "
+    "the Common Rule (45 CFR 46) and requires review by an Institutional Review Board (IRB). Even when "
+    "a researcher believes an analysis poses minimal risk and may qualify for an exemption, that "
+    "determination itself has to be made by the IRB, not assumed by the researcher. This review exists "
+    "for good reason -- it is the primary safeguard for patient rights and welfare in research -- but "
+    "it also means that before a single row of data can be analyzed, a formal, often multi-week "
+    "institutional process has to run its course, and it has to run separately at every participating "
+    "institution in a multi-site study.")
+
+add_heading(doc, "4.2 HIPAA, de-identification, and data use agreements", level=2)
 add_para(doc,
-    "LAC tends to build the smallest possible sets on average; APS tends to size its sets more "
-    "sensibly example-by-example -- growing more for genuinely ambiguous patients and shrinking more "
-    "for clear-cut ones -- which matters most in the multiclass setting used later in this report. "
-    "Implementation: conformal.aps_scores and conformal.APSPredictor.")
+    "Separately from IRB review, the HIPAA Privacy Rule governs any data that qualifies as Protected "
+    "Health Information (PHI) held by a covered entity. Sharing PHI outside the originating "
+    "institution requires patient authorization, a waiver, or de-identification meeting one of two "
+    "recognized standards: Safe Harbor (removing eighteen specific categories of identifier) or "
+    "Expert Determination (a qualified statistician formally certifies that re-identification risk is "
+    "very small). Both routes require real expertise and institutional sign-off, not just deleting a "
+    "name column. Moving data between institutions at all typically also requires a negotiated Data "
+    "Use Agreement (DUA) -- a legal contract specifying permitted uses, security controls, and "
+    "publication rights -- and DUAs are usually negotiated per pair of institutions, which is a large "
+    "part of why genuinely multi-site datasets are so much rarer than single-site ones: a four-hospital "
+    "study does not need one DUA, it potentially needs up to six.")
 
-add_image(doc, "paper/fig02_conformal_illustration.png",
-    "Figure 2.1 -- The method end to end, worked through visually on a 5-class example. Panel 1: "
-    "compute the score on one calibration point (how far the model's probability on the true class "
-    "fell short of 1). Panel 2: histogram the scores across the whole calibration set and mark the "
-    "quantile q_hat. Panel 3: for a brand-new patient, keep every class whose predicted probability "
-    "clears the 1 - q_hat bar -- the surviving classes are the prediction set. Produced by "
-    "paper_figures.fig02_conformal_illustration (Figure 2 of Angelopoulos & Bates, recreated with "
-    "the same 5-class severity framing used throughout this report).")
-
-add_image(doc, "paper/fig04_adaptive_prediction_sets.png",
-    "Figure 2.2 -- The APS mechanic specifically: sort classes by predicted probability (left), "
-    "accumulate that probability (right) until the running total crosses q_hat, and the classes up "
-    "to that point form the set. Produced by paper_figures.fig04_aps_illustration (Figure 4).")
-
-add_image(doc, "07_calibration_scores.png",
-    "Figure 2.3 -- The actual calibration-score histogram from this project's data (not a synthetic "
-    "illustration): LAC scores from a model trained across Cleveland, Hungary and the V.A., "
-    "calibrated on a held-out pool. The red line is q_hat -- everything to its left calibrates the "
-    "90% target. Produced by viz.plot_calibration_scores inside scripts/run_end_to_end_pipeline.py.")
-
-add_heading(doc, "2.4 Why the calibration-set size matters", level=2)
+add_heading(doc, "4.3 Even \"open\" datasets are usually credentialed, not public", level=2)
 add_para(doc,
-    "Because q_hat is estimated from a finite sample, the *realized* coverage on any particular test "
-    "set is itself a random quantity -- it will not sit exactly on 90% every time, even when every "
-    "assumption holds. Vovk (2012) showed this randomness follows a Beta distribution with parameters "
-    "tied directly to the calibration-set size n and alpha:")
-add_formula(doc, "Coverage  ~  Beta( n + 1 - l ,  l )     where   l = floor( (n + 1) x alpha )")
-add_para(doc,
-    "With only 50 calibration points, observed coverage can swing several percentage points around "
-    "the target just from sampling luck; with 1,000, it is tight. This matters directly for this "
-    "report's headline result: Switzerland's 71% coverage is far outside this benign-fluctuation "
-    "band even for a calibration set the size of Cleveland's (303 patients), which is how we know the "
-    "drop is a real site effect and not noise, rather than merely asserting it. Implementation: "
-    "evaluate.coverage_beta_interval, plotted analytically by viz.plot_coverage_beta.")
+    "Some of the best-known multi-institution clinical datasets are still gated behind a "
+    "credentialing process rather than being truly public downloads. PhysioNet's MIMIC-IV and eICU "
+    "Collaborative Research Database, for example, require a signed data use agreement and completion "
+    "of human-subjects-research training (commonly the CITI \"Data or Specimens Only Research\" "
+    "course) before an individual researcher can download the data -- a reasonable and proportionate "
+    "safeguard, but a real barrier for a live, drop-in teaching setting where attendees cannot be "
+    "expected to complete a multi-day credentialing process in advance.")
 
-add_image(doc, "11_coverage_beta.png",
-    "Figure 2.4 -- The Beta distribution of coverage at three calibration-set sizes (50, 150, 1000). "
-    "The smaller the calibration set, the wider and more uncertain the true coverage really is around "
-    "the 90% target -- context for judging whether an observed drop is a real site effect or just "
-    "noise. Produced by viz.plot_coverage_beta.")
-
-add_image(doc, "paper/fig11_coverage_distribution.png",
-    "Figure 2.5 -- The same idea recreated at the scale used in the original paper (n = 100, 1,000, "
-    "10,000), showing how sharply the distribution narrows as the calibration set grows. Produced by "
-    "paper_figures.fig11_coverage_distribution (Figure 11).")
-
-add_heading(doc, "2.5 Adaptivity: are the sets actually bigger where the model is unsure?", level=2)
-add_para(doc,
-    "A trivial way to hit 90% coverage is to always output every possible class -- technically "
-    "correct, completely useless. A good conformal predictor instead produces small sets for easy "
-    "cases and large sets for hard ones. We check this directly by tabulating the distribution of set "
-    "sizes at each hospital: a predictor that is well calibrated but *not* adaptive would show the "
-    "same size distribution everywhere; ours visibly widens at sites with more label ambiguity. "
-    "Implementation: evaluate.set_sizes / evaluate.average_set_size, plotted by "
-    "viz.plot_set_size_distribution.")
-
-add_image(doc, "10_set_sizes.png",
-    "Figure 2.6 -- Distribution of prediction-set sizes by site (5-class disease-severity task). "
-    "Larger sets at a given site mean the model is systematically less certain about patients from "
-    "that hospital. Produced by viz.plot_set_size_distribution.")
-
-add_heading(doc, "2.6 The subtler failure: class-conditional coverage", level=2)
-add_para(doc,
-    "Marginal coverage (the 90% averaged over every patient) can hide a second, independent kind of "
-    "failure: it can hit target overall while badly under-covering one specific class, particularly a "
-    "rare one, exactly the way it can hide a badly-covered site. We demonstrate this on the toolkit's "
-    "secondary task -- predicting chest-pain type (4 classes) rather than disease severity. Marginal "
-    "coverage across the pooled test set sits at 90%, but broken out by the true class, the rarest "
-    "category (typical angina, only 23 test patients) is covered just 26% of the time, while the most "
-    "common category (asymptomatic, 200 patients) is over-covered at 95.5%. Implementation: "
-    "evaluate.class_conditional_coverage, plotted by viz.plot_class_conditional_coverage.")
-
-add_image(doc, "cp/c04_class_conditional.png",
-    "Figure 2.7 -- Coverage broken out by true chest-pain class. The rare class (typical angina, "
-    "n = 23) is covered only 26% of the time against a 90% target -- invisible in the pooled 90% "
-    "marginal number, and exactly the sub-population a curation pipeline is most likely to serve "
-    "under-represented patients in. Produced by viz.plot_class_conditional_coverage inside "
-    "scripts/run_chest_pain_pipeline.py.")
-
-add_heading(doc, "2.7 Beyond classification: the same idea generalizes", level=2)
-add_para(doc,
-    "The prediction-set idea is not specific to classification. paper_figures.py recreates three "
-    "further illustrations from Angelopoulos & Bates showing the same 'score, quantile, widen' "
-    "recipe applied to (a) quantile regression, where the conformal step widens a fitted "
-    "prediction interval by exactly q_hat to reach guaranteed coverage; (b) a generic point "
-    "prediction plus an uncertainty scalar u(x), widened the same way; and (c) a Bayesian posterior "
-    "predictive density, where the prediction set becomes the region above a probability threshold. "
-    "These three figures use small synthetic examples, exactly as the original paper does, rather "
-    "than this project's clinical data -- they are included for conceptual completeness (the "
-    "workshop's method is not limited to classification) and are not part of the empirical results "
-    "in Sections 1, 3 or 4.")
-
-add_image(doc, "paper/fig06_conformalized_quantile_regression.png",
-    "Figure 2.8 -- Conformalized quantile regression: a fitted quantile band (dashed) widened by "
-    "q_hat (solid) to reach the coverage guarantee. Synthetic illustration. Produced by "
-    "paper_figures.fig06_cqr_illustration (Figure 6).")
-
-add_image(doc, "paper/fig08_uncertainty_scalar.png",
-    "Figure 2.9 -- A point prediction f(x) with a symmetric conformalized band q_hat * u(x). "
-    "Synthetic illustration. Produced by paper_figures.fig08_uncertainty_scalar (Figure 8).")
-
-add_image(doc, "paper/fig09_conformalized_bayes.png",
-    "Figure 2.10 -- Conformalized Bayes: the prediction set as the superlevel set of a posterior "
-    "predictive density. Synthetic illustration. Produced by paper_figures.fig09_bayes_superlevel "
-    "(Figure 9).")
-
-add_heading(doc, "2.8 Code-to-purpose map", level=2)
-add_para(doc, "Every module in src/fedconformal/, what it is responsible for, and which figure(s) "
-    "in this report it produces.", italic=True, color=MUTED)
+add_table_caption(doc, "Table 4.1 -- The layered barriers between a clinical dataset and a public download")
 add_table(doc,
-    ["Module", "Responsibility", "Key functions", "Figures produced"],
+    ["Barrier", "What it requires", "Typical effect"],
     [
-        ["data.py", "Load the 4 raw UCI site files, impute missing values, standardize, split "
-                    "into per-site arrays for either task", "load_raw, load_sites, preprocess, "
-                    "summarize_sites", "(feeds every figure; produces no plots itself)"],
-        ["heterogeneity.py", "Quantify site differences before any modeling: label shift, "
-                    "missingness, distributional divergence, a domain-classifier alarm",
-                    "missingness_report, js_divergence_matrix, domain_auc_matrix", "2, 4, 5"],
-        ["eda.py", "First-look exploratory plots of the raw inputs: target, features, "
-                    "correlation structure", "plot_target_distribution, plot_continuous_grid, "
-                    "plot_categorical_grid", "e01-e06"],
-        ["federated.py", "A from-scratch FedAvg simulator (binary logistic or softmax model, "
-                    "chosen automatically by class count) plus a centralized baseline",
-                    "federated_averaging, train_centralized, make_model", "6, cp/c02"],
-        ["conformal.py", "The conformal-prediction core: nonconformity scores, the quantile, "
-                    "and the two set-valued predictors", "conformal_quantile, lac_scores, "
-                    "aps_scores, LACPredictor, APSPredictor", "2.1, 2.2, 7"],
-        ["evaluate.py", "Every coverage/size metric used to grade a conformal predictor, plus "
-                    "the analytic Beta band for judging noise vs. signal", "coverage, "
-                    "average_set_size, size_stratified_coverage, class_conditional_coverage, "
-                    "coverage_beta_interval", "2.4, 2.5, 2.6"],
-        ["viz.py", "All plotting -- one function per figure, a fixed colorblind-safe site "
-                    "palette, a shared visual style", "plot_site_overview, "
-                    "plot_coverage_by_site, plot_transfer_matrix, plot_pca_scatter, ...",
-                    "nearly every figure in this report"],
-        ["paper_figures.py", "Recreations of the explanatory diagrams from Angelopoulos & Bates "
-                    "(2022), for teaching -- synthetic illustrations, not this project's data",
-                    "fig02...fig11", "2.1, 2.2, 2.4, 2.8, 2.9, 2.10, 1.2"],
+        ["IRB / Common Rule review", "Review (or a formal exemption determination) for essentially "
+         "any human-subjects research use, including retrospective analysis", "Weeks to months, "
+         "separately at every participating institution"],
+        ["HIPAA Privacy Rule", "De-identification via Safe Harbor (18 identifiers removed) or Expert "
+         "Determination (statistician-certified) before data can leave the covered entity",
+         "Requires dedicated expertise; incomplete de-identification blocks release entirely"],
+        ["Data Use Agreement (DUA)", "A negotiated legal contract between every pair of sharing "
+         "institutions, covering permitted uses, security and publication rights", "Often months per "
+         "institution pair; scales roughly quadratically with the number of sites"],
+        ["Credentialing (e.g. PhysioNet)", "Signed DUA plus completed human-subjects training (e.g. "
+         "CITI) before an individual researcher may download", "Days to weeks per researcher, "
+         "periodically renewed"],
+        ["Net effect", "The large majority of clinical data never becomes a public, redistributable "
+         "research dataset", "Federated learning becomes a practical necessity for genuine multi-site "
+         "study, not just a preferred architecture"],
     ])
 
+add_para(doc,
+    "This is what makes the dataset in Section 5 genuinely unusual. It was donated to the public UCI "
+    "Machine Learning Repository in 1988-89 -- more than a decade before the HIPAA Privacy Rule was "
+    "finalized (2000) and took effect (2003) -- and released with the explicit intent of open reuse. "
+    "A comparable four-hospital dataset collected today would, even with every institution fully "
+    "willing to share, face a materially higher bar to public release than this one did. That "
+    "historical accident is precisely why a workshop can hand attendees real, multi-institution "
+    "patient data with zero credentialing, and it is the direct bridge into the next section.")
+
 page_break(doc)
 
 # ==========================================================================
-# SECTION 3
+# SECTION 5 -- OUR DATASET
 # ==========================================================================
-add_heading(doc, "3. Why This Dataset Is an Ideal Testbed for Interoperability", level=1)
+add_heading(doc, "5. Our Dataset: The UCI Heart Disease Federation", level=1)
 add_para(doc,
     "A good demonstration dataset for \"interoperability is not comparability\" needs one property "
     "above all else: the four sources must genuinely be interoperable -- same variables, same coding, "
@@ -549,9 +453,11 @@ add_para(doc,
     "difference to find) and would teach nothing. The UCI Heart Disease federation is close to the "
     "opposite extreme: it is one of the very few open clinical datasets where four *real, independent* "
     "hospitals filled out the *same* form, so every difference we measure is a genuine site effect, "
-    "not an artefact of how the demonstration was constructed.")
+    "not an artefact of how the demonstration was constructed -- and, as Section 4 explained, one of "
+    "the very few such datasets that carries no access barrier at all.")
 
-add_heading(doc, "3.1 The four sites at a glance", level=2)
+add_heading(doc, "5.1 The four sites at a glance", level=2)
+add_table_caption(doc, "Table 5.1 -- The four hospital sites")
 add_table(doc,
     ["Site", "Institution", "Patients", "Any-disease prevalence", "Most common severity"],
     [
@@ -566,10 +472,11 @@ add_para(doc,
     "*true* distributional shift: Switzerland is a tertiary referral centre that sees a sicker, "
     "pre-selected population, not a data problem.")
 
-add_heading(doc, "3.2 Two different heterogeneity fingerprints, side by side", level=2)
+add_heading(doc, "5.2 Two different heterogeneity fingerprints, side by side", level=2)
 add_para(doc,
     "The dataset is unusually good at teaching the difference between real population variation and "
     "broken measurement, because it contains a clean example of each, at very different scales.")
+add_table_caption(doc, "Table 5.2 -- Two heterogeneity fingerprints, by site")
 add_table(doc,
     ["Feature", "What it measures", "Cleveland", "Hungary", "Switzerland", "V.A.", "Fingerprint"],
     [
@@ -594,17 +501,22 @@ add_para(doc,
     "toolkit is built to catch before it reaches a model.")
 
 add_image(doc, "02_missingness.png",
-    "Figure 3.1 -- Fraction of unrecorded values per feature per site, both fingerprints side by "
+    "Figure 5.1 -- Fraction of unrecorded values per feature per site, both fingerprints side by "
     "side. Cholesterol's 100% gap at Switzerland is visible; so is the much larger, near-universal "
     "gap in `ca` and `thal` outside Cleveland. Produced by viz.plot_missingness, from "
     "heterogeneity.missingness_report.")
 
+add_para(doc,
+    "The heatmap above summarizes the fraction missing; the next figure shows what the measured "
+    "values actually look like once the unrecorded cases are excluded rather than silently treated "
+    "as zero.")
 add_image(doc, "03_chol_distributions.png",
-    "Figure 3.2 -- Per-site distribution of measured cholesterol values (Switzerland has none to "
+    "Figure 5.2 -- Per-site distribution of measured cholesterol values (Switzerland has none to "
     "plot -- it is marked as fully unrecorded rather than silently included as zero). Produced by "
     "viz.plot_feature_distributions.")
 
-add_heading(doc, "3.3 True label shift: what we predict differs sharply by site", level=2)
+add_heading(doc, "5.3 True label shift: what we predict differs sharply by site", level=2)
+add_table_caption(doc, "Table 5.3 -- Severity class counts by site")
 add_table(doc,
     ["Severity class", "Cleveland", "Hungary", "Switzerland", "V.A.", "Pooled total"],
     [
@@ -620,14 +532,17 @@ add_para(doc,
     "population rather than a screening population.")
 
 add_image(doc, "eda/e01_target_distribution.png",
-    "Figure 3.3 -- Pooled 5-class severity distribution, and the derived binary any-disease summary. "
+    "Figure 5.3 -- Pooled 5-class severity distribution, and the derived binary any-disease summary. "
     "Produced by eda.plot_target_distribution.")
 
+add_para(doc,
+    "The pooled breakdown above hides which hospital contributes which severities; splitting it out "
+    "by site makes the label shift from Table 5.3 directly visible.")
 add_image(doc, "eda/e02_target_by_site.png",
-    "Figure 3.4 -- The same severity breakdown, split by site -- the label-shift story from Table "
-    "3.3 made visual. Produced by eda.plot_target_by_site.")
+    "Figure 5.4 -- The same severity breakdown, split by site -- the label-shift story from Table "
+    "5.3 made visual. Produced by eda.plot_target_by_site.")
 
-add_heading(doc, "3.4 Covariate shift: the sites are statistically -- and visibly -- separable", level=2)
+add_heading(doc, "5.4 Covariate shift: the sites are statistically -- and visibly -- separable", level=2)
 add_para(doc,
     "A more rigorous check than eyeballing histograms is to ask: can a simple classifier, given only "
     "a patient's clinical features (never told which hospital they came from), guess the hospital? "
@@ -635,6 +550,7 @@ add_para(doc,
     "indistinguishable and any model or calibration should transfer cleanly. If it can guess almost "
     "perfectly (AUC near 1.0), the sites occupy different regions of feature space and nothing "
     "trained at one is guaranteed to behave sensibly at another.")
+add_table_caption(doc, "Table 5.4 -- Pairwise domain-classifier AUC (5-fold cross-validated logistic regression)")
 add_table(doc,
     ["", "Cleveland", "Hungary", "Switzerland", "V.A."],
     [
@@ -643,16 +559,19 @@ add_table(doc,
         ["Switzerland", "1.00", "1.00", "0.50", "0.88"],
         ["V.A.", "0.88", "0.93", "0.88", "0.50"],
     ])
-add_para(doc, "Table 3.5 -- Pairwise domain-classifier AUC (5-fold cross-validated logistic "
-    "regression). Every off-diagonal value is 0.88 or higher -- these hospitals are almost perfectly "
+add_para(doc, "Every off-diagonal value is 0.88 or higher -- these hospitals are almost perfectly "
     "separable from features alone.", italic=True, color=MUTED, size=10)
 
 add_image(doc, "05_domain_auc.png",
-    "Figure 3.5 -- The AUC matrix as a heatmap. Produced by viz.plot_divergence_matrix, from "
+    "Figure 5.5 -- The AUC matrix as a heatmap. Produced by viz.plot_divergence_matrix, from "
     "heterogeneity.domain_auc_matrix.")
 
+add_para(doc,
+    "The AUC matrix asks whether a classifier can tell sites apart; Jensen-Shannon divergence asks a "
+    "narrower, complementary question directly about one feature's distribution shape, without "
+    "needing to train anything.")
 add_image(doc, "04_js_divergence.png",
-    "Figure 3.6 -- Jensen-Shannon divergence between sites for maximum heart rate (thalach): a "
+    "Figure 5.6 -- Jensen-Shannon divergence between sites for maximum heart rate (thalach): a "
     "second, distribution-shape-based confirmation of the same covariate-shift story, in a [0, 1] "
     "score where 0 means identical distributions. Produced by viz.plot_divergence_matrix, from "
     "heterogeneity.js_divergence_matrix.")
@@ -663,15 +582,19 @@ add_para(doc,
     "specifically for this report.")
 
 add_image(doc, "extra/x01_pca_scatter.png",
-    "Figure 3.7 (new) -- Every patient's 13 standardized clinical features compressed to two "
+    "Figure 5.7 (new) -- Every patient's 13 standardized clinical features compressed to two "
     "principal components and colored by site. Even in just two dimensions -- a small fraction of "
     "the original information -- Switzerland (green) forms a visually distinct lower cluster and "
     "Cleveland (blue) skews toward the upper right; the clouds are not on top of each other. This is "
-    "the geometric picture behind the domain-classifier AUC numbers in Table 3.5. Produced by the "
+    "the geometric picture behind the domain-classifier AUC numbers in Table 5.4. Produced by the "
     "newly added viz.plot_pca_scatter, via scripts/run_supplementary_figures.py.")
 
+add_para(doc,
+    "The PCA view above compresses all 13 features at once; the next scatterplot instead picks two "
+    "features a clinician would recognize, to show the same separability in familiar clinical units "
+    "rather than abstract components.")
 add_image(doc, "extra/x02_age_thalach_scatter.png",
-    "Figure 3.8 (new) -- Age vs. maximum heart rate achieved, colored by site. The downward trend "
+    "Figure 5.8 (new) -- Age vs. maximum heart rate achieved, colored by site. The downward trend "
     "(older patients reach a lower max heart rate) holds at every hospital -- the underlying "
     "physiology is universal -- but the V.A. and Switzerland clouds sit measurably lower than "
     "Cleveland's for the same age, and Hungary's patients skew younger overall. Same biology, "
@@ -679,29 +602,44 @@ add_image(doc, "extra/x02_age_thalach_scatter.png",
     "is valuable for. Produced by the newly added viz.plot_age_thalach_scatter, via "
     "scripts/run_supplementary_figures.py.")
 
+add_para(doc,
+    "Having established that sites differ (Figures 5.5-5.8), the next four figures return to the "
+    "underlying input data itself and ask which individual features actually drive that difference "
+    "and which ones drive the disease-severity prediction task.")
 add_image(doc, "eda/e03_continuous_grid.png",
-    "Figure 3.9 -- All five continuous features, split by severity class. Where the five severity "
+    "Figure 5.9 -- All five continuous features, split by severity class. Where the five severity "
     "curves separate, that feature is informative for the model; where they overlap, it is not. "
     "Produced by eda.plot_continuous_grid.")
 
+add_para(doc,
+    "Max heart rate stood out in Figure 5.9 as one of the more separated features by severity; the "
+    "box plots below isolate it by site instead, for a cleaner read on the shift than the scatter in "
+    "Figure 5.8 alone provides.")
 add_image(doc, "eda/e04_thalach_by_site.png",
-    "Figure 3.10 -- Max heart rate distribution by site as box plots -- the same shift visible in "
-    "Figure 3.8, without the age dimension. Produced by eda.plot_feature_boxplots_by_site.")
+    "Figure 5.10 -- Max heart rate distribution by site as box plots -- the same shift visible in "
+    "Figure 5.8, without the age dimension. Produced by eda.plot_feature_boxplots_by_site.")
 
+add_para(doc,
+    "The continuous features above are only half the picture; the categorical and ordinal clinical "
+    "variables (chest-pain type, exercise angina, ST slope, thalassemia result, and others) carry at "
+    "least as much signal.")
 add_image(doc, "eda/e05_categorical_grid.png",
-    "Figure 3.11 -- Mean severity within each level of six categorical features (chest-pain type, "
+    "Figure 5.11 -- Mean severity within each level of six categorical features (chest-pain type, "
     "sex, exercise angina, ST slope, resting ECG, thalassemia result). Asymptomatic chest pain, "
     "exercise-induced angina, a flat/down ST slope and a reversible thalassemia defect all carry "
     "substantially higher mean severity -- clinically sensible relationships the model can exploit, "
     "and a sanity check that the loaded data behaves the way cardiology domain knowledge predicts. "
     "Produced by eda.plot_categorical_grid.")
 
+add_para(doc,
+    "Finally, viewing every feature relationship at once as a correlation matrix confirms nothing in "
+    "Figures 5.9-5.11 is contradicted by the pairwise structure of the data.")
 add_image(doc, "eda/e06_correlation.png",
-    "Figure 3.12 -- Pearson correlation among all 13 features and the 5-class severity target. "
+    "Figure 5.12 -- Pearson correlation among all 13 features and the 5-class severity target. "
     "Chest-pain type, exercise angina, ST depression, max heart rate and vessel count are the "
     "strongest correlates of severity. Produced by eda.plot_correlation_heatmap.")
 
-add_heading(doc, "3.5 The secondary task confirms this is not a fluke of one label choice", level=2)
+add_heading(doc, "5.5 The secondary task confirms this is not a fluke of one label choice", level=2)
 add_para(doc,
     "If the heterogeneity story depended on the specific choice of \"predict disease severity,\" it "
     "would be a weaker argument. The toolkit supports a second, independent task on the same four "
@@ -710,11 +648,11 @@ add_para(doc,
     "particular target.")
 
 add_image(doc, "cp/c01_class_distribution.png",
-    "Figure 3.13 -- Chest-pain-type distribution by site, the secondary-task analogue of Figure 3.4. "
+    "Figure 5.13 -- Chest-pain-type distribution by site, the secondary-task analogue of Figure 5.4. "
     "Hungary is heavy on atypical angina; Switzerland is roughly 80% asymptomatic. Produced by "
     "viz.plot_class_distribution_by_site, via scripts/run_chest_pain_pipeline.py.")
 
-add_heading(doc, "3.6 Summary: what makes this dataset ideal", level=2)
+add_heading(doc, "5.6 Summary: what makes this dataset ideal", level=2)
 add_bullets(doc, [
     "Genuinely interoperable: all four sites used the same case-report form and the same 13-variable "
     "schema -- there is no format barrier to integration, which isolates the *meaning* problem from "
@@ -724,20 +662,475 @@ add_bullets(doc, [
     "toolkit's core distinction is not hypothetical.",
     "Small enough to train and calibrate live in a workshop (920 patients, sub-second training), "
     "large enough that the effects are statistically real rather than noise (Beta-band-checked in "
-    "Section 1.3).",
-    "Open, credential-free, and citable -- no data-use agreement stands between a workshop attendee "
-    "and running the code themselves.",
+    "Section 7.3).",
+    "Open, credential-free, and citable, for the historical reasons explained in Section 4 -- no "
+    "data-use agreement stands between a workshop attendee and running the code themselves.",
     "The finding replicates on a second, independently chosen prediction task on the same sites "
-    "(Figure 3.13), which is evidence the heterogeneity is a property of the hospitals, not an "
+    "(Figure 5.13), which is evidence the heterogeneity is a property of the hospitals, not an "
     "artefact of the modeling choice.",
 ])
 
 page_break(doc)
 
 # ==========================================================================
-# SECTION 4
+# SECTION 6 -- METHODS OF INTEROPERABILITY
 # ==========================================================================
-add_heading(doc, "4. Pipeline Walkthrough and Justification: Is This Enough?", level=1)
+add_heading(doc, "6. Methods of Interoperability: Choosing a Standard", level=1)
+add_para(doc,
+    "Section 5 relied on a lucky historical accident: four hospitals happened to fill out the same "
+    "paper case-report form. A real curation pipeline built today does not get to rely on luck -- it "
+    "has to deliberately choose a data standard. This section surveys the realistic options and "
+    "recommends one, and then explains exactly what adopting it does, and does not, solve.")
+
+add_heading(doc, "6.1 Interoperability has levels, and most mandates stop at the easy ones", level=2)
+add_para(doc,
+    "HIMSS (the Healthcare Information and Management Systems Society) distinguishes four levels of "
+    "interoperability: foundational (data can move from one system to another at all), structural "
+    "(the format and structure of the exchanged data is standardized, e.g. a consistent field for "
+    "\"cholesterol\"), semantic (the exchanged value carries a standardized, shared meaning, e.g. a "
+    "specific LOINC code that both systems interpret identically), and organizational (the "
+    "governance, policy and workflow context needed for the exchange to actually happen in practice). "
+    "Most current regulatory mandates (Section 3.3) are strongest at the foundational and structural "
+    "levels. Semantic interoperability -- the level where this report's entire heterogeneity story "
+    "lives -- is the hardest to mandate and the easiest to get only partway to.")
+
+add_heading(doc, "6.2 The standards landscape", level=2)
+add_table_caption(doc, "Table 6.1 -- Clinical data standards compared for this workshop's use case")
+add_table(doc,
+    ["Standard", "Primary use case", "Structural interoperability", "Semantic interoperability", "Fit for multi-site research"],
+    [
+        ["HL7 v2 messaging", "Legacy point-to-point clinical messaging (labs, admissions, orders)",
+         "Moderate -- widely implemented but loosely enforced", "Weak -- minimal standard "
+         "vocabulary binding", "Poor: still the production backbone in many hospitals, but not "
+         "designed for pooled research analysis"],
+        ["HL7 FHIR", "Modern REST/JSON API exchange; the standard named in current US/EU "
+         "interoperability mandates", "Strong", "Moderate-to-strong when paired with standard "
+         "terminologies (LOINC, SNOMED CT, RxNorm) -- inconsistently adopted site to site",
+         "Good for live exchange; not itself a research-analysis data model"],
+        ["OMOP Common Data Model (OHDSI)", "Standardizing observational health data from many "
+         "institutions into one schema and vocabulary for pooled/federated research",
+         "Strong", "Strong -- the standard vocabulary mapping is the point of the model",
+         "Excellent: purpose-built for exactly this report's use case"],
+        ["openEHR", "Archetype-based clinical modeling with very high semantic expressiveness",
+         "Strong", "Strong", "Good in principle; limited adoption in US hospital systems specifically"],
+        ["CDISC SDTM / ADaM", "Regulated clinical-trial data submission to FDA/EMA", "Strong",
+         "Strong, within the trial-data domain", "Poor fit: built for trials, not observational "
+         "multi-site EHR data"],
+        ["DICOM", "Medical imaging exchange and storage", "Strong (imaging-specific)",
+         "Strong (imaging-specific)", "Not applicable to this workshop's tabular clinical variables, "
+         "but the correct standard once imaging enters a curation pipeline"],
+    ])
+
+add_heading(doc, "6.3 Recommendation", level=2)
+add_para(doc,
+    "For this workshop's specific problem -- tabular, structured, multi-site observational data, "
+    "aimed at pooled or federated statistical analysis rather than a real-time clinical transaction "
+    "-- the OMOP Common Data Model is the standard best matched to the goal. Its entire design purpose "
+    "is forcing every participating site to map its local coding of, say, \"chest pain type\" or "
+    "\"cholesterol\" onto the same standard concept before analysis, which is exactly the step that "
+    "would have flagged (though not eliminated -- see below) the kind of silent semantic drift "
+    "Sections 5, 7 and 8 spend most of this report measuring after the fact. OMOP is not a niche "
+    "proposal: the OHDSI research network built on it already spans a very large, multi-national "
+    "federation of observational health databases used for exactly this kind of pooled and federated "
+    "study.")
+add_para(doc,
+    "FHIR remains the right choice for the transport and live-exchange layer -- it is the standard "
+    "actually named in current US and EU regulatory mandates (Section 3.3), and it is what a hospital "
+    "system's electronic health record will expose today. A realistic production recommendation is "
+    "therefore not \"OMOP instead of FHIR,\" but a two-layer stack: FHIR to move data out of clinical "
+    "systems, OMOP CDM (or an equivalent research-purpose common data model) as the harmonized "
+    "analytic layer built from what FHIR delivers.")
+add_para(doc,
+    "The essential caveat, and the reason this recommendation does not make the rest of this report "
+    "unnecessary, is that adopting either standard is necessary but not sufficient. A common schema "
+    "and a common vocabulary reduce, but do not eliminate, measurement-process heterogeneity -- a "
+    "hospital can code cholesterol correctly to the right LOINC concept and still simply order that "
+    "test less often than another hospital does, which reproduces Switzerland's missingness pattern "
+    "(Section 5.2) inside a perfectly standards-compliant pipeline. No coding standard changes the "
+    "fact that a tertiary referral centre sees a sicker, pre-selected population either. That is why "
+    "this toolkit's heterogeneity diagnostics (Section 5) and conformal-coverage diagnostics "
+    "(Sections 7-8) belong *downstream* of any standardization effort as a mandatory verification "
+    "step, not as a one-time substitute for one.")
+add_para(doc,
+    "It is worth being explicit that the UCI dataset itself predates and does not use any of these "
+    "standards -- it is distributed as raw, fixed-format, per-site flat files. That is a feature for "
+    "this report's purposes, not a flaw: it shows what pre-standardization interoperability looked "
+    "like, and every figure in Section 5 is a direct, honest picture of what a modern common data "
+    "model would, and would not, have caught. Standardizing the format would have caught nothing "
+    "about the true prevalence swing across sites (Table 5.1) -- that is real biology, not a coding "
+    "problem -- and would very likely have caught, or at least flagged, the `ca`/`thal` measurement "
+    "gap (Table 5.2), since a well-governed common-data-model pipeline typically reports per-site "
+    "concept-level completeness as a matter of course.",
+    italic=True, color=MUTED)
+
+page_break(doc)
+
+# ==========================================================================
+# SECTION 7 -- WHY CONFORMAL PREDICTION HELPS
+# ==========================================================================
+add_heading(doc, "7. Why Conformal Prediction Helps With Site-Level Heterogeneity", level=1)
+
+add_heading(doc, "7.1 The problem: models are confident even when they are wrong", level=2)
+add_para(doc,
+    "A typical machine-learning classifier reports a number that looks like a probability -- "
+    "\"92% chance this patient has heart disease.\" That number is not actually a probability in "
+    "any guaranteed sense; it is whatever the model happened to output. Nothing forces it to be "
+    "correct 92% of the time. In practice, a model trained on one hospital's patients and then run "
+    "on a different hospital's patients often stays just as confident -- the 92% does not shrink -- "
+    "while its actual correctness rate quietly drops. The model does not know it has left home. This "
+    "is the single most dangerous failure mode in cross-institution deployment: not a model that "
+    "visibly fails, but one that fails silently while sounding just as sure of itself as it did "
+    "during development.")
+add_para(doc,
+    "Interoperability standards (Section 6) solve the problem of *getting the data there*. They do "
+    "nothing to solve this problem, because the failure is not about the data format -- it is about "
+    "whether the statistical relationship the model learned at Hospital A still holds at Hospital B. "
+    "Two hospitals can use an identical schema, an identical column called \"cholesterol,\" and still "
+    "have that column mean something different in practice (measured routinely at one site, almost "
+    "never measured at another). A model cannot tell the difference between a hospital with "
+    "genuinely different patients and a hospital with a broken measurement pipeline unless something "
+    "is specifically built to check.")
+
+add_heading(doc, "7.2 What conformal prediction actually does", level=2)
+add_para(doc,
+    "Conformal prediction is a wrapper you can put around *any* trained model -- logistic "
+    "regression, a neural network, anything that outputs a score per class -- that converts its "
+    "raw scores into a set of plausible answers, with a guarantee attached to the size and content "
+    "of that set. Instead of the model saying \"heart disease, severity 2, 92% confident,\" a "
+    "conformal predictor says \"the true severity is somewhere in {1, 2, 3}, and this kind of "
+    "statement is right at least 90% of the time.\" When the model is unsure, the set grows to "
+    "include more possibilities; when it is sure, the set can shrink to a single class. Crucially, "
+    "the 90% figure is not a hope -- it is a mathematical guarantee that holds regardless of whether "
+    "the underlying model is any good, as long as one condition holds: the data you calibrate the "
+    "guarantee on must look statistically like the data you later apply it to.")
+add_para(doc,
+    "That condition -- formally called *exchangeability*, discussed in Section 8 -- is exactly where "
+    "site heterogeneity enters the picture. Calibrating a conformal predictor at one hospital and "
+    "deploying it at another silently assumes the two hospitals are exchangeable. If they are not, "
+    "the 90% promise degrades to whatever the real cross-site agreement supports, and conformal "
+    "prediction becomes a *measuring instrument* for that degradation: you calibrate at one site, "
+    "check the empirical coverage at every other site, and the gap between the promised rate and the "
+    "observed rate is a direct, quantitative readout of how much that pair of sites disagrees. No "
+    "other common technique gives you a single interpretable number for \"how much can I trust this "
+    "model somewhere it hasn't been tested.\"")
+
+add_heading(doc, "7.3 Averages hide the failure -- you have to look per site", level=2)
+add_para(doc,
+    "The single most important lesson in this toolkit is that a pooled, dataset-wide coverage number "
+    "can look perfect while hiding a badly broken subgroup. A conformal predictor calibrated across "
+    "all four hospitals together can report 90% coverage overall while one hospital sits at 70% and "
+    "the others compensate by over-covering. This is exactly what we observe: a model federated over "
+    "Cleveland, Hungary and the V.A., then calibrated using only Cleveland patients and deployed "
+    "everywhere, hits 90-91% coverage at Cleveland, Hungary and the V.A. -- and drops to 71% at "
+    "Switzerland, the hospital the federation never trained on (Figure 7.3). Reported as one pooled "
+    "number, this problem is invisible. Reported per site, it is impossible to miss. That is the "
+    "practical argument for conformal prediction in a curation pipeline: it is cheap to compute, "
+    "attaches to any model you already have, and turns \"is this data comparable across sites\" from "
+    "a qualitative judgment call into a number you can put in a table and set a threshold on.")
+
+add_image(doc, "01_site_overview.png",
+    "Figure 7.1 -- Patients per site and disease prevalence per site. Prevalence swings from "
+    "36% (Hungary) to 94% (Switzerland): a genuine difference in patient population (true "
+    "distributional shift), not a data-entry artefact. Produced by viz.plot_site_overview, called "
+    "from data.summarize_sites.")
+
+add_para(doc,
+    "Before showing the empirical result, it helps to see the distinction it depends on drawn "
+    "schematically first.")
+add_image(doc, "paper/fig10_coverage_notions.png",
+    "Figure 7.2 -- The distinction this whole report rests on, drawn schematically for two groups. "
+    "Left: no coverage guarantee at all. Middle: 'marginal' coverage -- the overall average looks "
+    "fine (green dots) while one group is quietly failing (concentrated red dots). Right: "
+    "'conditional' coverage -- every group is covered at the target rate individually. Produced by "
+    "paper_figures.fig10_coverage_notions, a recreation of Figure 10 in Angelopoulos & Bates (2022).")
+
+add_para(doc,
+    "That schematic is not hypothetical here -- this is the real measurement on this project's data.")
+add_image(doc, "09_coverage_by_site.png",
+    "Figure 7.3 -- The headline empirical result. A conformal predictor calibrated only on "
+    "Cleveland data is deployed at all four hospitals. It meets the 90% target at Cleveland, Hungary "
+    "and the V.A., and silently drops to 71% at Switzerland -- well outside the shaded 'benign "
+    "fluctuation' band that captures ordinary sampling noise, meaning this drop is a real effect, "
+    "not chance. Produced by viz.plot_coverage_by_site, using conformal.LACPredictor and "
+    "evaluate.coverage.")
+
+add_para(doc,
+    "Figure 7.3 fixed the calibration site at Cleveland; the transfer matrix below generalizes that "
+    "to every possible calibrate/deploy pairing at once.")
+add_image(doc, "08_transfer_matrix.png",
+    "Figure 7.4 -- The full picture: calibrate at the row's hospital, deploy at the column's "
+    "hospital, read off coverage. The diagonal (calibrate and deploy at the same hospital) is "
+    "healthy everywhere. Off-diagonal cells show what happens when a hospital's calibration is "
+    "exported elsewhere -- deploying anything calibrated on Cleveland, Hungary or the V.A. at "
+    "Switzerland lands around 70-72%, while a Switzerland-calibrated predictor over-covers "
+    "everywhere else (its patients are on average sicker, so its threshold is looser than it needs "
+    "to be elsewhere). Produced by viz.plot_transfer_matrix.")
+
+add_table_caption(doc, "Table 7.1 -- Coverage of a Cleveland-calibrated predictor, by deployment site "
+    "(target: 90%, calibration set = 303 Cleveland patients, split-conformal LAC score, α = 0.10)")
+add_table(doc,
+    ["Deployment site", "Empirical coverage", "Gap vs. 90% target", "Verdict"],
+    [
+        ["Cleveland (same site as calibration)", "90.8%", "+0.8 pp", "Meets target"],
+        ["Hungary", "90.8%", "+0.8 pp", "Meets target"],
+        ["V.A. Long Beach", "90.5%", "+0.5 pp", "Meets target"],
+        ["Switzerland (never seen by the federated model)", "70.7%", "−19.3 pp", "Fails, silently"],
+    ])
+add_para(doc,
+    "This is the practical payoff for a curation pipeline: instead of trusting that a model \"should\" "
+    "generalize because the incoming data is schema-compliant, you get a per-site number that tells "
+    "you exactly where trust breaks down, before a clinician or downstream system relies on it.",
+    italic=True, color=MUTED)
+
+page_break(doc)
+
+# ==========================================================================
+# SECTION 8 -- THE MATHEMATICS
+# ==========================================================================
+add_heading(doc, "8. The Mathematics, and What Every Piece of Code Produces", level=1)
+add_para(doc,
+    "This section explains the method in plain language first, gives the exact formula each idea "
+    "corresponds to, and then says precisely which file and which function in the toolkit implements "
+    "it and which figure it produces. Everything here is implemented in plain NumPy -- no black-box "
+    "library -- specifically so every step can be read line by line.")
+
+add_heading(doc, "8.1 The one assumption everything rests on: exchangeability", level=2)
+add_para(doc,
+    "Conformal prediction needs exactly one statistical assumption, and it is weaker than almost "
+    "anything else in statistics: the calibration data and the test data must be *exchangeable* -- "
+    "informally, drawn from the same underlying process, so that shuffling the order of the combined "
+    "set would not tell you anything about which points were 'calibration' and which were 'test'. It "
+    "does not require the data to be Gaussian, linearly separable, or generated by any particular "
+    "model at all. This is what makes conformal prediction so widely applicable -- and it is also "
+    "exactly the assumption that cross-hospital deployment violates. Calibration data from Cleveland "
+    "and test data from Switzerland are not exchangeable if Switzerland patients are drawn from a "
+    "different population (94% disease prevalence vs. Cleveland's 46%). The guarantee below is "
+    "conditional on an assumption that this dataset is specifically built to violate on purpose, so "
+    "that the violation is visible.")
+
+add_heading(doc, "8.2 The nonconformity score and the conformal quantile", level=2)
+add_para(doc,
+    "Step one: define a single number, the 'nonconformity score,' that measures how surprising a "
+    "true label was, given what the model predicted. A large score means the model's output looked "
+    "nothing like the truth; a small score means the model was basically right. Step two: compute "
+    "this score for every point in a held-out 'calibration' set the model never trained on. Step "
+    "three: take a specific, slightly-inflated quantile of those calibration scores -- inflated just "
+    "enough to make the finite-sample guarantee exact rather than approximate:")
+add_math(doc, [
+    ("q̂  =  Quantile( s", "normal"), ("1", "sub"), (", …, s", "normal"), ("n", "sub"),
+    (" ;  ⌈(n + 1)(1 − α)⌉ / n )", "normal"),
+])
+add_para(doc,
+    "Here n is the number of calibration points and α (alpha) is the error rate you are willing "
+    "to accept (α = 0.10 throughout this report, i.e. a 90% target). Step four: for any new "
+    "patient, build the prediction set by keeping every candidate label whose score would not have "
+    "exceeded q̂ (\"q-hat\"):")
+add_math(doc, [("C(x)  =  { y : s(x, y) ≤ q̂ }", "normal")])
+add_para(doc,
+    "This is the entire method. The proof that P(true label ∈ C(x)) ≥ 1 − α is a short "
+    "exchangeability argument (Angelopoulos & Bates, 2022, Section 2) -- the important practical "
+    "point is that it works for *any* nonconformity score and *any* underlying model. "
+    "Implementation: conformal.conformal_quantile(scores, alpha). Both predictors described below "
+    "call it as their calibration step.")
+
+add_heading(doc, "8.3 Two ways to define the score: LAC and APS", level=2)
+add_para(doc,
+    "\"LAC\" (Least Ambiguous set-valued Classifier) uses the simplest possible score: one minus the "
+    "model's softmax probability on the true class.")
+add_math(doc, [
+    ("s", "normal"), ("i", "sub"), ("  =  1 − f̂(x", "normal"), ("i", "sub"), (")", "normal"),
+    ("y", "sub"), ("i", "sub"),
+])
+add_para(doc,
+    "A score near 0 means the model put almost all its probability mass on the correct class; a "
+    "score near 1 means the model was confidently wrong. Implementation: conformal.lac_scores and "
+    "conformal.LACPredictor.")
+add_para(doc,
+    "\"APS\" (Adaptive Prediction Sets, Romano, Sesia & Candes, 2020) instead sorts the classes from "
+    "most to least likely and adds up probability mass until it reaches the true class:")
+add_math(doc, [
+    ("s(x, y)  =  ", "normal"), ("Σ", "normal"), ("j=1", "sub"), ("o(y)", "sup"),
+    ("  π̂", "normal"), ("(j)", "sub"), ("(x)", "normal"),
+])
+add_para(doc,
+    "where the classes are sorted by decreasing predicted probability π̂"
+    "₁(x) ≥ π̂₂(x) ≥ … , π̂"
+    "₍ⱼ₎(x) denotes the probability of the class ranked j-th in that order, and o(y) "
+    "is the rank of the true class y itself -- so the score is just the cumulative probability mass "
+    "swept up to and including the true class.")
+add_para(doc,
+    "LAC tends to build the smallest possible sets on average; APS tends to size its sets more "
+    "sensibly example-by-example -- growing more for genuinely ambiguous patients and shrinking more "
+    "for clear-cut ones -- which matters most in the multiclass setting used later in this report. "
+    "Implementation: conformal.aps_scores and conformal.APSPredictor.")
+
+add_image(doc, "paper/fig02_conformal_illustration.png",
+    "Figure 8.1 -- The method end to end, worked through visually on a 5-class example. Panel 1: "
+    "compute the score on one calibration point (how far the model's probability on the true class "
+    "fell short of 1). Panel 2: histogram the scores across the whole calibration set and mark the "
+    "quantile q̂. Panel 3: for a brand-new patient, keep every class whose predicted probability "
+    "clears the 1 - q̂ bar -- the surviving classes are the prediction set. Produced by "
+    "paper_figures.fig02_conformal_illustration (Figure 2 of Angelopoulos & Bates, recreated with "
+    "the same 5-class severity framing used throughout this report).")
+
+add_para(doc,
+    "Figure 8.1 showed the LAC score end to end; the same three-step recipe applies to APS, with the "
+    "sorting-and-accumulating mechanic shown separately below.")
+add_image(doc, "paper/fig04_adaptive_prediction_sets.png",
+    "Figure 8.2 -- The APS mechanic specifically: sort classes by predicted probability (left), "
+    "accumulate that probability (right) until the running total crosses q̂, and the classes up "
+    "to that point form the set. Produced by paper_figures.fig04_aps_illustration (Figure 4).")
+
+add_para(doc,
+    "Both illustrations above use synthetic scores chosen to make the mechanic legible; the histogram "
+    "below is the real LAC calibration-score distribution from this project's federated model.")
+add_image(doc, "07_calibration_scores.png",
+    "Figure 8.3 -- The actual calibration-score histogram from this project's data (not a synthetic "
+    "illustration): LAC scores from a model trained across Cleveland, Hungary and the V.A., "
+    "calibrated on a held-out pool. The red line is q̂ -- everything to its left calibrates the "
+    "90% target. Produced by viz.plot_calibration_scores inside scripts/run_end_to_end_pipeline.py.")
+
+add_heading(doc, "8.4 Why the calibration-set size matters", level=2)
+add_para(doc,
+    "Because q̂ is estimated from a finite sample, the *realized* coverage on any particular test "
+    "set is itself a random quantity -- it will not sit exactly on 90% every time, even when every "
+    "assumption holds. Vovk (2012) showed this randomness follows a Beta distribution with parameters "
+    "tied directly to the calibration-set size n and α:")
+add_math(doc, [
+    ("Coverage  ∼  Beta( n + 1 − ℓ , ℓ )     where     ℓ = ⌊ (n + 1) α ⌋", "normal"),
+])
+add_para(doc,
+    "With only 50 calibration points, observed coverage can swing several percentage points around "
+    "the target just from sampling luck; with 1,000, it is tight. This matters directly for this "
+    "report's headline result: Switzerland's 71% coverage is far outside this benign-fluctuation "
+    "band even for a calibration set the size of Cleveland's (303 patients), which is how we know the "
+    "drop is a real site effect and not noise, rather than merely asserting it. Implementation: "
+    "evaluate.coverage_beta_interval, plotted analytically by viz.plot_coverage_beta.")
+
+add_image(doc, "11_coverage_beta.png",
+    "Figure 8.4 -- The Beta distribution of coverage at three calibration-set sizes (50, 150, 1000). "
+    "The smaller the calibration set, the wider and more uncertain the true coverage really is around "
+    "the 90% target -- context for judging whether an observed drop is a real site effect or just "
+    "noise. Produced by viz.plot_coverage_beta.")
+
+add_para(doc,
+    "Figure 8.4 used calibration sizes matched to this project's actual sites (50-1,000 patients); "
+    "the recreation below repeats the same idea at the much larger scale used in the original paper, "
+    "for comparison.")
+add_image(doc, "paper/fig11_coverage_distribution.png",
+    "Figure 8.5 -- The same idea recreated at the scale used in the original paper (n = 100, 1,000, "
+    "10,000), showing how sharply the distribution narrows as the calibration set grows. Produced by "
+    "paper_figures.fig11_coverage_distribution (Figure 11).")
+
+add_heading(doc, "8.5 Adaptivity: are the sets actually bigger where the model is unsure?", level=2)
+add_para(doc,
+    "A trivial way to hit 90% coverage is to always output every possible class -- technically "
+    "correct, completely useless. A good conformal predictor instead produces small sets for easy "
+    "cases and large sets for hard ones. We check this directly by tabulating the distribution of set "
+    "sizes at each hospital: a predictor that is well calibrated but *not* adaptive would show the "
+    "same size distribution everywhere; ours visibly widens at sites with more label ambiguity. "
+    "Implementation: evaluate.set_sizes / evaluate.average_set_size, plotted by "
+    "viz.plot_set_size_distribution.")
+
+add_image(doc, "10_set_sizes.png",
+    "Figure 8.6 -- Distribution of prediction-set sizes by site (5-class disease-severity task). "
+    "Larger sets at a given site mean the model is systematically less certain about patients from "
+    "that hospital. Produced by viz.plot_set_size_distribution.")
+
+add_heading(doc, "8.6 The subtler failure: class-conditional coverage", level=2)
+add_para(doc,
+    "Marginal coverage (the 90% averaged over every patient) can hide a second, independent kind of "
+    "failure: it can hit target overall while badly under-covering one specific class, particularly a "
+    "rare one, exactly the way it can hide a badly-covered site. We demonstrate this on the toolkit's "
+    "secondary task -- predicting chest-pain type (4 classes) rather than disease severity. Marginal "
+    "coverage across the pooled test set sits at 90%, but broken out by the true class, the rarest "
+    "category (typical angina, only 23 test patients) is covered just 26% of the time, while the most "
+    "common category (asymptomatic, 200 patients) is over-covered at 95.5%. Implementation: "
+    "evaluate.class_conditional_coverage, plotted by viz.plot_class_conditional_coverage.")
+
+add_image(doc, "cp/c04_class_conditional.png",
+    "Figure 8.7 -- Coverage broken out by true chest-pain class. The rare class (typical angina, "
+    "n = 23) is covered only 26% of the time against a 90% target -- invisible in the pooled 90% "
+    "marginal number, and exactly the sub-population a curation pipeline is most likely to serve "
+    "under-represented patients in. Produced by viz.plot_class_conditional_coverage inside "
+    "scripts/run_chest_pain_pipeline.py.")
+
+add_heading(doc, "8.7 Beyond classification: the same idea generalizes", level=2)
+add_para(doc,
+    "The prediction-set idea is not specific to classification. paper_figures.py recreates three "
+    "further illustrations from Angelopoulos & Bates showing the same 'score, quantile, widen' "
+    "recipe applied to (a) quantile regression, where the conformal step widens a fitted "
+    "prediction interval by exactly q̂ to reach guaranteed coverage; (b) a generic point "
+    "prediction plus an uncertainty scalar u(x), widened the same way; and (c) a Bayesian posterior "
+    "predictive density, where the prediction set becomes the region above a probability threshold. "
+    "These three figures use small synthetic examples, exactly as the original paper does, rather "
+    "than this project's clinical data -- they are included for conceptual completeness (the "
+    "workshop's method is not limited to classification) and are not part of the empirical results "
+    "in Sections 5, 7 or 9.")
+
+add_image(doc, "paper/fig06_conformalized_quantile_regression.png",
+    "Figure 8.8 -- Conformalized quantile regression: a fitted quantile band (dashed) widened by "
+    "q̂ (solid) to reach the coverage guarantee. Synthetic illustration. Produced by "
+    "paper_figures.fig06_cqr_illustration (Figure 6).")
+
+add_para(doc,
+    "The quantile-regression band above widens an already-interval-valued prediction; the next "
+    "illustration instead starts from a single point prediction and conformalizes it with a "
+    "generic uncertainty scalar.")
+add_image(doc, "paper/fig08_uncertainty_scalar.png",
+    "Figure 8.9 -- A point prediction f(x) with a symmetric conformalized band q̂ · u(x). "
+    "Synthetic illustration. Produced by paper_figures.fig08_uncertainty_scalar (Figure 8).")
+
+add_para(doc,
+    "The final variant swaps a frequentist point prediction for a full Bayesian posterior predictive "
+    "density, and takes the prediction set to be the region where that density is highest.")
+add_image(doc, "paper/fig09_conformalized_bayes.png",
+    "Figure 8.10 -- Conformalized Bayes: the prediction set as the superlevel set of a posterior "
+    "predictive density. Synthetic illustration. Produced by paper_figures.fig09_bayes_superlevel "
+    "(Figure 9).")
+
+add_heading(doc, "8.8 Code-to-purpose map", level=2)
+add_table_caption(doc, "Table 8.1 -- Every module in src/fedconformal/, its responsibility, and the "
+    "figures it produces")
+add_table(doc,
+    ["Module", "Responsibility", "Key functions", "Figures produced"],
+    [
+        ["data.py", "Load the 4 raw UCI site files, impute missing values, standardize, split "
+                    "into per-site arrays for either task", "load_raw, load_sites, preprocess, "
+                    "summarize_sites", "(feeds every figure; produces no plots itself)"],
+        ["heterogeneity.py", "Quantify site differences before any modeling: label shift, "
+                    "missingness, distributional divergence, a domain-classifier alarm",
+                    "missingness_report, js_divergence_matrix, domain_auc_matrix",
+                    "Figs. 5.1, 5.5, 5.6"],
+        ["eda.py", "First-look exploratory plots of the raw inputs: target, features, "
+                    "correlation structure", "plot_target_distribution, plot_continuous_grid, "
+                    "plot_categorical_grid", "Figs. 5.3, 5.4, 5.9-5.12"],
+        ["federated.py", "A from-scratch FedAvg simulator (binary logistic or softmax model, "
+                    "chosen automatically by class count) plus a centralized baseline",
+                    "federated_averaging, train_centralized, make_model", "Figs. 9.2, 9.3"],
+        ["conformal.py", "The conformal-prediction core: nonconformity scores, the quantile, "
+                    "and the two set-valued predictors", "conformal_quantile, lac_scores, "
+                    "aps_scores, LACPredictor, APSPredictor",
+                    "Underlies every coverage/set figure (Figs. 7.3, 7.4, 8.1, 8.2, ...)"],
+        ["evaluate.py", "Every coverage/size metric used to grade a conformal predictor, plus "
+                    "the analytic Beta band for judging noise vs. signal", "coverage, "
+                    "average_set_size, size_stratified_coverage, class_conditional_coverage, "
+                    "coverage_beta_interval", "Figs. 8.4, 8.6, 8.7"],
+        ["viz.py", "All plotting -- one function per figure, a fixed colorblind-safe site "
+                    "palette, a shared visual style", "plot_site_overview, "
+                    "plot_coverage_by_site, plot_transfer_matrix, plot_pca_scatter, ...",
+                    "nearly every figure in this report"],
+        ["paper_figures.py", "Recreations of the explanatory diagrams from Angelopoulos & Bates "
+                    "(2022), for teaching -- synthetic illustrations, not this project's data",
+                    "fig02...fig11", "Figs. 7.2, 8.1, 8.2, 8.5, 8.8-8.10"],
+    ])
+
+page_break(doc)
+
+# ==========================================================================
+# SECTION 9 -- PIPELINE WALKTHROUGH
+# ==========================================================================
+add_heading(doc, "9. Pipeline Walkthrough and Justification: Is This Enough?", level=1)
 add_para(doc,
     "This section traces one execution of the full pipeline end to end, then gives an honest "
     "assessment of what is solid, what is a reasonable simplification for a workshop setting, and "
@@ -745,16 +1138,16 @@ add_para(doc,
     "teaching toolkit.")
 
 add_image(doc, "extra/x03_pipeline_overview.png",
-    "Figure 4.1 (new) -- The five-stage pipeline, module by module. Data flows left to right: raw "
+    "Figure 9.1 (new) -- The five-stage pipeline, module by module. Data flows left to right: raw "
     "per-site files are loaded and imputed, heterogeneity is measured *before* anything is trained "
     "(deliberately -- this ordering is the whole point of the workshop's framing), a shared model is "
     "trained federatively, a conformal predictor is calibrated on top of it, and coverage is graded "
     "per site rather than pooled. Produced by the newly added viz.plot_pipeline_overview, via "
-    "scripts/run_supplementary_figures.py. No equivalent overview figure existed before this report -- it "
-    "was added because a reader arriving fresh at 33 figures benefits from one picture of how they "
-    "connect.")
+    "scripts/run_supplementary_figures.py. No equivalent overview figure existed before this report "
+    "-- it was added because a reader arriving fresh at 35 figures benefits from one picture of how "
+    "they connect.")
 
-add_heading(doc, "4.1 Stage 3: federated training actually converges", level=2)
+add_heading(doc, "9.1 Stage 3: federated training actually converges", level=2)
 add_para(doc,
     "Before conformal calibration means anything, the underlying model has to have actually learned "
     "something. FedAvg trains a shared softmax model across Cleveland, Hungary and the V.A. (holding "
@@ -763,21 +1156,25 @@ add_para(doc,
     "communication round -- no patient-level data ever leaves its hospital.")
 
 add_image(doc, "06_fed_curves.png",
-    "Figure 4.2 -- Per-site training loss across FedAvg communication rounds, 5-class disease task. "
+    "Figure 9.2 -- Per-site training loss across FedAvg communication rounds, 5-class disease task. "
     "All three participating sites' losses fall together, confirming the federated procedure "
     "converges. Produced by viz.plot_fed_learning_curves.")
 
+add_para(doc,
+    "The same convergence check, repeated on the chest-pain task, confirms FedAvg is not something "
+    "that happens to work only for the disease-severity target.")
 add_image(doc, "cp/c02_fed_curves.png",
-    "Figure 4.3 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
+    "Figure 9.3 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
     "behaves consistently across two different targets. Produced by viz.plot_fed_learning_curves, "
     "via scripts/run_chest_pain_pipeline.py.")
 
-add_heading(doc, "4.2 Does the story change with a different task and a different score function?", level=2)
+add_heading(doc, "9.2 Does the story change with a different task and a different score function?", level=2)
 add_para(doc,
     "A natural objection: does the whole story depend on the particular choice of disease-severity "
-    "prediction and the LAC score? scripts/compare_prediction_tasks.py runs the identical analysis -- label "
-    "shift, covariate shift, cross-site conformal transfer, using the APS score this time -- on both "
-    "the 5-class disease task and the 4-class chest-pain task, side by side.")
+    "prediction and the LAC score? scripts/compare_prediction_tasks.py runs the identical analysis "
+    "-- label shift, covariate shift, cross-site conformal transfer, using the APS score this time -- "
+    "on both the 5-class disease task and the 4-class chest-pain task, side by side.")
+add_table_caption(doc, "Table 9.1 -- The 5-class disease task and the 4-class chest-pain task, head to head")
 add_table(doc,
     ["Metric", "Disease task (5-class)", "Chest-pain task (4-class)"],
     [
@@ -799,33 +1196,43 @@ add_para(doc,
     "function.")
 
 add_image(doc, "compare/task_comparison.png",
-    "Figure 4.4 -- The comparison from Table 4.1, plotted: heterogeneity scores, average prediction-"
+    "Figure 9.4 -- The comparison from Table 9.1, plotted: heterogeneity scores, average prediction-"
     "set size, and worst-case cross-site coverage, disease task vs. chest-pain task, side by side. "
     "Produced by compare_prediction_tasks.plot_comparison.")
 
-add_heading(doc, "4.3 The secondary task's own conformal pipeline, run in full", level=2)
+add_heading(doc, "9.3 The secondary task's own conformal pipeline, run in full", level=2)
 add_para(doc,
     "For completeness, the chest-pain task's own cross-site transfer matrix and set-size distribution "
-    "-- the same diagnostics as Section 1, applied to a different label -- are included below rather "
-    "than only summarized in Table 4.1.")
+    "-- the same diagnostics as Section 7, applied to a different label -- are included below rather "
+    "than only summarized in Table 9.1.")
 
 add_image(doc, "cp/c05_transfer_matrix.png",
-    "Figure 4.5 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "
+    "Figure 9.5 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "
     "by viz.plot_transfer_matrix, via scripts/run_chest_pain_pipeline.py.")
 
+add_para(doc,
+    "The transfer matrix above summarizes every calibrate/deploy pairing at once; fixing the "
+    "calibration site at Cleveland specifically -- the same headline framing as Figure 7.3 -- makes "
+    "the single-predictor case easier to read directly.")
 add_image(doc, "cp/c06_coverage_by_site.png",
-    "Figure 4.6 -- Coverage of a Cleveland-calibrated chest-pain predictor across all four sites. "
+    "Figure 9.6 -- Coverage of a Cleveland-calibrated chest-pain predictor across all four sites. "
     "Produced by viz.plot_coverage_by_site, via scripts/run_chest_pain_pipeline.py.")
 
+add_para(doc,
+    "Coverage alone does not show adaptivity; the set-size distribution below is the chest-pain "
+    "task's analogue of Figure 8.6.")
 add_image(doc, "cp/c07_set_sizes.png",
-    "Figure 4.7 -- Prediction-set-size distribution by site, chest-pain task. Produced by "
+    "Figure 9.7 -- Prediction-set-size distribution by site, chest-pain task. Produced by "
     "viz.plot_set_size_distribution, via scripts/run_chest_pain_pipeline.py.")
 
+add_para(doc,
+    "Rounding out the secondary-task diagnostics, the calibration-score histogram below is the "
+    "chest-pain analogue of Figure 8.3.")
 add_image(doc, "cp/c03_calibration_scores.png",
-    "Figure 4.8 -- The chest-pain task's own calibration-score histogram, the secondary-task analogue "
-    "of Figure 2.3. Produced by viz.plot_calibration_scores, via scripts/run_chest_pain_pipeline.py.")
+    "Figure 9.8 -- The chest-pain task's own calibration-score histogram, the secondary-task analogue "
+    "of Figure 8.3. Produced by viz.plot_calibration_scores, via scripts/run_chest_pain_pipeline.py.")
 
-add_heading(doc, "4.4 Verdict: is the pipeline right as it stands?", level=2)
+add_heading(doc, "9.4 Verdict: is the pipeline right as it stands?", level=2)
 add_para(doc,
     "Yes, for its stated purpose. Every claim this report makes is backed by a figure generated from "
     "a real, reproducible run (all 8 notebooks and 6 scripts execute cleanly end to end, and 10 "
@@ -844,7 +1251,7 @@ add_bullets(doc, [
     "\"models are confident even when wrong\" -- directly measurable rather than only illustrated.",
     "Feature-stratified coverage by patient subgroup (sex, age band), not only by site, is already "
     "implemented in evaluate.feature_stratified_coverage but is not currently plotted anywhere -- an "
-    "easy addition that would extend the class-conditional-coverage lesson (Section 2.6) to "
+    "easy addition that would extend the class-conditional-coverage lesson (Section 8.6) to "
     "demographic fairness within a single site.",
     "The per-site mean-imputation of `ca`/`thal` (necessary so the model can train at all, given "
     "80-99% missingness outside Cleveland) is silent by default; adding an explicit 'was this value "
@@ -858,6 +1265,10 @@ add_bullets(doc, [
     "hospital never touched during either development or the heterogeneity analysis itself) would "
     "strengthen the claim that the observed coverage drop generalizes beyond this specific "
     "four-hospital federation.",
+    "The interoperability-standards discussion in Section 6 is a recommendation, not an "
+    "implementation -- an OMOP CDM mapping of this exact dataset, with per-concept completeness "
+    "reported the way a real OHDSI network study would, would turn Section 6's argument from "
+    "reasoned advocacy into a second, standards-based measurement of the same heterogeneity story.",
 ])
 add_para(doc,
     "None of these are required to support the report's central claims -- each is a natural next "
@@ -871,52 +1282,54 @@ page_break(doc)
 # ==========================================================================
 add_heading(doc, "Appendix: Full Figure Index", level=1)
 add_para(doc,
-    "All 33 figures referenced in this report, in file order, with the script or notebook that "
+    "All 35 figures referenced in this report, in file order, with the script or notebook that "
     "generates each one. Every figure is reproducible by running the listed command from the "
     "repository root.")
 
 appendix_rows = [
-    ("figures/01_site_overview.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.1"),
-    ("figures/02_missingness.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.1"),
-    ("figures/03_chol_distributions.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.2"),
-    ("figures/04_js_divergence.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.6"),
-    ("figures/05_domain_auc.png", "scripts/run_end_to_end_pipeline.py", "Fig. 3.5"),
-    ("figures/06_fed_curves.png", "scripts/run_end_to_end_pipeline.py", "Fig. 4.2"),
-    ("figures/07_calibration_scores.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.3"),
-    ("figures/08_transfer_matrix.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.4"),
-    ("figures/09_coverage_by_site.png", "scripts/run_end_to_end_pipeline.py", "Fig. 1.3"),
-    ("figures/10_set_sizes.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.6"),
-    ("figures/11_coverage_beta.png", "scripts/run_end_to_end_pipeline.py", "Fig. 2.4"),
-    ("figures/eda/e01_target_distribution.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.3"),
-    ("figures/eda/e02_target_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.4"),
-    ("figures/eda/e03_continuous_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.9"),
-    ("figures/eda/e04_thalach_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.10"),
-    ("figures/eda/e05_categorical_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.11"),
-    ("figures/eda/e06_correlation.png", "scripts/run_exploratory_data_analysis.py", "Fig. 3.12"),
-    ("figures/cp/c01_class_distribution.png", "scripts/run_chest_pain_pipeline.py", "Fig. 3.13"),
-    ("figures/cp/c02_fed_curves.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.3"),
-    ("figures/cp/c03_calibration_scores.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.8"),
-    ("figures/cp/c04_class_conditional.png", "scripts/run_chest_pain_pipeline.py", "Fig. 2.7"),
-    ("figures/cp/c05_transfer_matrix.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.5"),
-    ("figures/cp/c06_coverage_by_site.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.6"),
-    ("figures/cp/c07_set_sizes.png", "scripts/run_chest_pain_pipeline.py", "Fig. 4.7"),
-    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.1"),
-    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.2"),
-    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.8"),
-    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.9"),
-    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.10"),
-    ("figures/paper/fig10_coverage_notions.png", "scripts/run_paper_figure_recreations.py", "Fig. 1.2"),
-    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figure_recreations.py", "Fig. 2.5"),
-    ("figures/compare/task_comparison.png", "scripts/compare_prediction_tasks.py", "Fig. 4.4"),
-    ("figures/extra/x01_pca_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 3.7"),
-    ("figures/extra/x02_age_thalach_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 3.8"),
-    ("figures/extra/x03_pipeline_overview.png", "scripts/run_supplementary_figures.py (new)", "Fig. 4.1"),
+    ("figures/01_site_overview.png", "scripts/run_end_to_end_pipeline.py", "Fig. 7.1"),
+    ("figures/02_missingness.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.1"),
+    ("figures/03_chol_distributions.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.2"),
+    ("figures/04_js_divergence.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.6"),
+    ("figures/05_domain_auc.png", "scripts/run_end_to_end_pipeline.py", "Fig. 5.5"),
+    ("figures/06_fed_curves.png", "scripts/run_end_to_end_pipeline.py", "Fig. 9.2"),
+    ("figures/07_calibration_scores.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.3"),
+    ("figures/08_transfer_matrix.png", "scripts/run_end_to_end_pipeline.py", "Fig. 7.4"),
+    ("figures/09_coverage_by_site.png", "scripts/run_end_to_end_pipeline.py", "Fig. 7.3"),
+    ("figures/10_set_sizes.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.6"),
+    ("figures/11_coverage_beta.png", "scripts/run_end_to_end_pipeline.py", "Fig. 8.4"),
+    ("figures/eda/e01_target_distribution.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.3"),
+    ("figures/eda/e02_target_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.4"),
+    ("figures/eda/e03_continuous_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.9"),
+    ("figures/eda/e04_thalach_by_site.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.10"),
+    ("figures/eda/e05_categorical_grid.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.11"),
+    ("figures/eda/e06_correlation.png", "scripts/run_exploratory_data_analysis.py", "Fig. 5.12"),
+    ("figures/cp/c01_class_distribution.png", "scripts/run_chest_pain_pipeline.py", "Fig. 5.13"),
+    ("figures/cp/c02_fed_curves.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.3"),
+    ("figures/cp/c03_calibration_scores.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.8"),
+    ("figures/cp/c04_class_conditional.png", "scripts/run_chest_pain_pipeline.py", "Fig. 8.7"),
+    ("figures/cp/c05_transfer_matrix.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.5"),
+    ("figures/cp/c06_coverage_by_site.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.6"),
+    ("figures/cp/c07_set_sizes.png", "scripts/run_chest_pain_pipeline.py", "Fig. 9.7"),
+    ("figures/paper/fig02_conformal_illustration.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.1"),
+    ("figures/paper/fig04_adaptive_prediction_sets.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.2"),
+    ("figures/paper/fig06_conformalized_quantile_regression.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.8"),
+    ("figures/paper/fig08_uncertainty_scalar.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.9"),
+    ("figures/paper/fig09_conformalized_bayes.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.10"),
+    ("figures/paper/fig10_coverage_notions.png", "scripts/run_paper_figure_recreations.py", "Fig. 7.2"),
+    ("figures/paper/fig11_coverage_distribution.png", "scripts/run_paper_figure_recreations.py", "Fig. 8.5"),
+    ("figures/compare/task_comparison.png", "scripts/compare_prediction_tasks.py", "Fig. 9.4"),
+    ("figures/extra/x01_pca_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 5.7"),
+    ("figures/extra/x02_age_thalach_scatter.png", "scripts/run_supplementary_figures.py (new)", "Fig. 5.8"),
+    ("figures/extra/x03_pipeline_overview.png", "scripts/run_supplementary_figures.py (new)", "Fig. 9.1"),
 ]
 add_table(doc, ["File", "Generated by", "Referenced as"], appendix_rows)
 
 add_para(doc,
-    "Reproduce everything: python scripts/run_end_to_end_pipeline.py && python scripts/run_chest_pain_pipeline.py && "
-    "python scripts/run_exploratory_data_analysis.py && python scripts/run_paper_figure_recreations.py && "
+    "Reproduce everything: python scripts/run_end_to_end_pipeline.py && "
+    "python scripts/run_chest_pain_pipeline.py && "
+    "python scripts/run_exploratory_data_analysis.py && "
+    "python scripts/run_paper_figure_recreations.py && "
     "python scripts/compare_prediction_tasks.py && python scripts/run_supplementary_figures.py",
     italic=True, size=9.5, color=MUTED)
 
