@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, FancyBboxPatch
 
 from .data import SITES, SITE_LABELS
 from . import evaluate as ev
@@ -426,5 +426,99 @@ def plot_coverage_beta(alpha=0.1, ns=(50, 150, 1000), save=None):
     ax.set_ylabel("density")
     ax.set_yticks([])
     ax.legend()
+    fig.tight_layout()
+    return _save(fig, save)
+
+
+# ----------------------------------------------------------------------------
+# 7. Interoperability diagnostics: scatter views of site separability
+# ----------------------------------------------------------------------------
+
+def plot_pca_scatter(sites, save=None):
+    """2D PCA scatter of the pooled, standardized clinical features, colored by
+    site. A visual companion to the domain-classifier AUC (heterogeneity.py):
+    if the four site clouds separate on the page, a simple linear model can
+    tell the hospitals apart from features alone -- the geometric signature of
+    covariate shift, and a warning that a model fit at one site may not
+    transfer to another even before labels are considered.
+    """
+    from sklearn.decomposition import PCA
+    set_style()
+    X = np.vstack([sites[s].X for s in SITES])
+    site_of_row = np.concatenate([[s] * sites[s].n for s in SITES])
+    pca = PCA(n_components=2, random_state=0)
+    Z = pca.fit_transform(X)
+    var = pca.explained_variance_ratio_
+
+    fig, ax = plt.subplots(figsize=(7.8, 6.2))
+    for s in SITES:
+        m = site_of_row == s
+        ax.scatter(Z[m, 0], Z[m, 1], s=26, alpha=0.75, color=SITE_COLORS[s],
+                   marker=SITE_MARKERS[s], label=s.capitalize(),
+                   edgecolors="white", linewidths=0.4)
+    ax.set_xlabel(f"principal component 1  ({var[0]:.0%} of variance)")
+    ax.set_ylabel(f"principal component 2  ({var[1]:.0%} of variance)")
+    ax.set_title("Sites separate even in two dimensions\n"
+                 "(the geometric echo of the domain-classifier AUC)")
+    ax.legend(title="site")
+    fig.tight_layout()
+    return _save(fig, save)
+
+
+def plot_age_thalach_scatter(df, save=None):
+    """Scatter of age vs. maximum heart rate achieved (thalach), colored by
+    site. A clinically intuitive pair -- max heart rate falls with age in
+    every population -- so this plot shows the *same physiological trend*
+    persisting across hospitals while its measured range still shifts, a
+    concrete, human-readable picture of interoperable-but-not-identical data.
+    """
+    set_style()
+    fig, ax = plt.subplots(figsize=(8.2, 5.8))
+    for s in SITES:
+        sub = df[(df["site"] == s) & (df["thalach"] > 0)]
+        ax.scatter(sub["age"], sub["thalach"], s=24, alpha=0.7,
+                   color=SITE_COLORS[s], marker=SITE_MARKERS[s],
+                   label=s.capitalize(), edgecolors="white", linewidths=0.4)
+    ax.set_xlabel("age (years)")
+    ax.set_ylabel("maximum heart rate achieved (thalach, bpm)")
+    ax.set_title("Age vs. max heart rate by site\n"
+                 "a shared physiological trend, a shifted measurement range")
+    ax.legend(title="site")
+    fig.tight_layout()
+    return _save(fig, save)
+
+
+# ----------------------------------------------------------------------------
+# 8. Pipeline overview
+# ----------------------------------------------------------------------------
+
+def plot_pipeline_overview(save=None):
+    """Schematic of the end-to-end pipeline, module by module."""
+    set_style()
+    fig, ax = plt.subplots(figsize=(13, 3.0))
+    steps = [
+        ("1. Load & impute\ndata.py", "#2a78d6"),
+        ("2. Quantify\nheterogeneity\nheterogeneity.py", "#eb6834"),
+        ("3. Federated\ntraining\nfederated.py", "#1baf7a"),
+        ("4. Conformal\ncalibration\nconformal.py", "#4a3aa7"),
+        ("5. Per-site\nevaluation\nevaluate.py", "#d03b3b"),
+    ]
+    n = len(steps)
+    xs = np.linspace(0.5, n - 0.5, n)
+    for x, (label, color) in zip(xs, steps):
+        box = FancyBboxPatch((x - 0.43, 0.22), 0.86, 0.56,
+                             boxstyle="round,pad=0.02,rounding_size=0.04",
+                             fc=color, ec="white", linewidth=1.5, alpha=0.92)
+        ax.add_patch(box)
+        ax.text(x, 0.5, label, ha="center", va="center", color="white",
+                fontsize=9.5, fontweight="bold")
+    for i in range(n - 1):
+        ax.annotate("", xy=(xs[i + 1] - 0.44, 0.5), xytext=(xs[i] + 0.44, 0.5),
+                   arrowprops=dict(arrowstyle="-|>", color=INK_2, lw=1.8))
+    ax.set_xlim(0, n)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    ax.set_title("The fedconformal pipeline, end to end", fontsize=13,
+                fontweight="bold")
     fig.tight_layout()
     return _save(fig, save)
