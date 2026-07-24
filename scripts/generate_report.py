@@ -8,7 +8,7 @@ output and are refreshed by hand if the pipeline numbers change).
 
 Structure: Introduction -> Challenges -> Motivation -> The
 Difficulty of Working With Real Clinical Data -> Our Dataset -> Methods of
-Interoperability (standards + recommendation) -> Why Conformal Prediction
+Interoperability (standards survey) -> Why Conformal Prediction
 Helps -> The Mathematics -> Pipeline Walkthrough -> Appendix.
 
 Run:  python scripts/generate_report.py
@@ -65,6 +65,14 @@ def add_bullets(doc, items, size=11):
         p = doc.add_paragraph(style="List Bullet")
         run = p.add_run(it)
         run.font.size = Pt(size)
+
+
+def add_numbered(doc, items, size=10.5):
+    for it in items:
+        p = doc.add_paragraph(style="List Number")
+        run = p.add_run(it)
+        run.font.size = Pt(size)
+        p.paragraph_format.space_after = Pt(6)
 
 
 def add_image(doc, path, caption, width=6.2):
@@ -166,24 +174,78 @@ style.font.color.rgb = INK
 # ---- Title page -------------------------------------------------------
 title = doc.add_paragraph()
 title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = title.add_run("Beyond Interoperability")
-run.font.size = Pt(28)
+run = title.add_run("Beyond Interoperability: Hands-On Federated ML for "
+                    "Research Data Curation Infrastructure")
+run.font.size = Pt(26)
 run.bold = True
 run.font.color.rgb = ACCENT
 
 sub = doc.add_paragraph()
 sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = sub.add_run("Conformal Prediction for Site-Level Heterogeneity\nin Federated Clinical Data")
-run.font.size = Pt(16)
+run = sub.add_run("Technical Companion: Conformal Prediction for Site-Level Heterogeneity\n"
+                  "in Federated Clinical Data")
+run.font.size = Pt(15)
 run.font.color.rgb = INK
 
 sub2 = doc.add_paragraph()
 sub2.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = sub2.add_run("A technical report and workshop companion for the fedconformal-clinical toolkit\n"
-                   "UCI Heart Disease federation · 4 hospitals · 920 patients · 33 figures")
+                   "UCI Heart Disease federation · 4 hospitals · 920 patients")
 run.font.size = Pt(11.5)
 run.italic = True
 run.font.color.rgb = MUTED
+
+# Author / affiliation, as given by the workshop proposal. Venue/date was not
+# provided, so that field alone stays a flagged placeholder rather than invented.
+PLACEHOLDER = RGBColor(0xc0, 0x3a, 0x2b)
+authors = doc.add_paragraph()
+authors.alignment = WD_ALIGN_PARAGRAPH.CENTER
+authors.paragraph_format.space_before = Pt(28)
+run = authors.add_run("Arnab Mukherjee")
+run.font.size = Pt(12.5)
+run.bold = True
+run.font.color.rgb = INK
+run = authors.add_run("\nOklahoma State University — Center for Health Science, Tulsa")
+run.font.size = Pt(11)
+run.font.color.rgb = INK
+
+venue = doc.add_paragraph()
+venue.alignment = WD_ALIGN_PARAGRAPH.CENTER
+venue.paragraph_format.space_before = Pt(10)
+run = venue.add_run("[Workshop / venue name and date — add here]")
+run.font.size = Pt(11)
+run.font.color.rgb = PLACEHOLDER
+
+page_break(doc)
+
+# ---- Abstract -------------------------------------------------------------
+# Verbatim from the workshop proposal -- not paraphrased.
+add_heading(doc, "Abstract", level=1)
+add_para(doc,
+    "Interoperability—the ability of systems to securely exchange, interpret, and use data "
+    "without human intervention—has become a foundation of modern research data curation "
+    "infrastructure. Yet interoperability alone does not establish whether data from different sites "
+    "encode equivalent underlying phenomena. When clinical data exhibits a distributional shift "
+    "across institutions, models trained at one site may fail silently at another. Confident but "
+    "wrong is the worst possible failure mode, particularly when models are deployed across "
+    "organizations. This is the foundational curation challenge this workshop addresses. Research "
+    "software without borders requires not just that data can cross institutional lines, but that "
+    "what the data means can be trusted on the other side. Site-level measurement heterogeneity "
+    "determines whether data generated across diverse sources can be meaningfully compared, "
+    "interpreted, and trusted as part of a shared research infrastructure. We complement "
+    "interoperability-focused approaches by developing methods to identify and quantify site-level "
+    "heterogeneity before data and models are integrated, thereby distinguishing true underlying "
+    "variation from measurement-induced differences and establishing a more reliable foundation for "
+    "curation in cross-site federated research.",
+    size=11)
+add_para(doc,
+    "This workshop translates that framework into practice. Participants will engage in hands-on "
+    "Python exercises using conformal prediction under simulated site-level heterogeneity, working "
+    "directly with federated ML tools designed for research data curation pipelines. Attendees will "
+    "leave with reusable code, a conceptual framework for distinguishing distributional shift from "
+    "measurement-induced heterogeneity, and practical uncertainty quantification tools they can "
+    "deploy within their own cross-institutional curation infrastructure.",
+    size=11)
 
 page_break(doc)
 
@@ -199,6 +261,7 @@ toc_items = [
     "7. Why Conformal Prediction Helps With Site-Level Heterogeneity",
     "8. The Mathematics, and What Every Piece of Code Produces",
     "9. Pipeline Walkthrough and Justification: Is This Enough?",
+    "References",
     "Appendix: Full Figure Index",
 ]
 for it in toc_items:
@@ -307,56 +370,75 @@ add_para(doc,
 
 add_heading(doc, "3.1 Clinical AI is being deployed faster than it is being validated across sites", level=2)
 add_para(doc,
-    "The number of AI- and machine-learning-enabled tools cleared for clinical use has grown "
-    "substantially in recent years, and that growth has outpaced the development of standard practice "
-    "for validating those tools beyond the site (or sites) where they were trained. It is now "
-    "well documented in the clinical-ML literature that models validated at one hospital can "
+    "It is well documented in the clinical-ML literature that models validated at one hospital can "
     "underperform when deployed at another -- differences in patient case-mix, equipment, and "
     "measurement practice are enough to degrade performance even when the input schema is identical. "
-    "Regulators have taken notice: evolving FDA guidance on AI/ML-based software as a medical device "
-    "explicitly calls for real-world performance monitoring across sites and subpopulations after "
-    "deployment, not just a single pre-market validation number. That is precisely the per-site, "
-    "per-subgroup accountability this toolkit's diagnostics are built to provide.")
+    "Regulators have taken notice of the same pattern: the FDA's approach to AI/ML-enabled medical "
+    "devices now explicitly includes real-world performance monitoring after deployment -- tracking "
+    "for performance drift and monitoring across subpopulations, not stopping at a single pre-market "
+    "validation number [FDA-AI-SaMD]. That is precisely the per-site, per-subgroup accountability "
+    "this toolkit's diagnostics are built to provide.")
 
 add_heading(doc, "3.2 Federated learning has moved from research curiosity to practical necessity", level=2)
 add_para(doc,
     "Federated learning -- training a shared model by exchanging weights instead of data -- was "
-    "popularized around 2016-17 for keyboard-prediction models on phones, where centralizing personal "
-    "keystroke data was undesirable but not legally prohibitive. In healthcare the same architecture "
-    "has become close to mandatory rather than optional, because (as Section 4 details) centralizing "
+    "introduced by McMahan et al. (2017) [McMahan17] and popularized soon after for keyboard-"
+    "prediction models on phones (Hard et al., 2018) [Hard18], where centralizing personal keystroke "
+    "data was undesirable but not legally prohibitive. In healthcare the same architecture is close to "
+    "a practical necessity rather than a stylistic choice, because (as Section 4 details) centralizing "
     "patient-level records across institutions is frequently not something a legal and regulatory "
-    "process will approve on any reasonable timeline. The result is a fast-growing body of federated "
-    "clinical-ML research and infrastructure -- multi-hospital consortia, federated benchmark suites "
-    "such as FLamby, and federated extensions of standard toolkits -- all converging on the same "
-    "constraint this report's simulator is built around: train without moving the data.")
+    "process will approve on any reasonable timeline. Purpose-built federated healthcare benchmarks "
+    "such as FLamby (Terrail et al., 2022) [FLamby22] -- which includes the same four-hospital UCI "
+    "Heart Disease population used in this report, as its own filtered \"Fed-Heart-Disease\" task "
+    "(one of seven cross-silo benchmarks) -- reflect the same constraint this report's simulator is "
+    "built around: train without moving the data.")
 
-add_heading(doc, "3.3 Interoperability is now a regulatory mandate, which raises the stakes on the semantic gap", level=2)
+add_heading(doc, "3.3 Interoperability mandates target structural, not semantic, interoperability", level=2)
 add_para(doc,
-    "In the United States, the ONC's 21st Century Cures Act Final Rule requires certified health IT "
-    "systems to expose standardized, FHIR-based APIs, and the Trusted Exchange Framework and Common "
-    "Agreement (TEFCA) is actively rolling out a nationwide \"network of networks\" for health "
-    "information exchange. The European Union's proposed European Health Data Space regulation aims "
-    "at a similar cross-border standard. These are genuine, significant achievements -- but they "
-    "mandate *structural* interoperability (can the bytes move, in an agreed format) far more "
-    "directly than *semantic* interoperability (does the moved value mean the same clinical fact "
-    "everywhere). As more institutions become technically interoperable by mandate, the silent "
-    "semantic gap this report measures becomes more consequential, not less: it is now the primary "
-    "remaining barrier standing between \"the data arrived\" and \"the data can be trusted,\" which is "
-    "exactly the subject of Section 6.")
+    "In the United States, the ONC's 21st Century Cures Act Final Rule required certified health IT "
+    "developers to expose FHIR-based APIs to their customers [ONC-Cures], and the Trusted Exchange "
+    "Framework and Common Agreement (TEFCA) is now an operating nationwide network for health "
+    "information exchange, with tens of thousands of participating sites [TEFCA]. In the European "
+    "Union, the European Health Data Space Regulation (EU) 2025/327 was adopted in early 2025 and "
+    "will progressively apply from 2027 [EHDS25]. These are genuine, significant achievements -- but "
+    "each one mandates *structural* interoperability (can the bytes move, in an agreed format) far "
+    "more directly than *semantic* interoperability (does the moved value mean the same clinical fact "
+    "everywhere; see the HIMSS levels in Section 6.1). As more institutions become technically "
+    "interoperable by mandate, the silent semantic gap this report measures becomes more consequential, "
+    "not less: it is the remaining barrier standing between \"the data arrived\" and \"the data can be "
+    "trusted,\" which is exactly the subject of Section 6.")
 
-add_heading(doc, "3.4 Trustworthy, auditable uncertainty is a fast-growing requirement of its own", level=2)
+add_heading(doc, "3.4 Auditable uncertainty quantification is a natural complement to these mandates", level=2)
 add_para(doc,
-    "Alongside interoperability mandates, there is growing regulatory and clinical demand for AI "
-    "systems that can quantify their own uncertainty in a way that can be audited, not just asserted. "
     "Conformal prediction is one of very few uncertainty-quantification methods that offers a "
-    "distribution-free, finite-sample coverage guarantee -- it does not depend on the underlying model "
-    "being well-specified or Bayesian, which is a large part of why it has seen rapid adoption in "
-    "exactly this kind of high-stakes, regulated setting over the past few years.")
+    "distribution-free, finite-sample coverage guarantee -- a mathematical property (proved in Section "
+    "8) that does not depend on the underlying model being well-specified, Bayesian, or of any "
+    "particular architecture. That property is exactly what a per-site, auditable accountability check "
+    "needs: a number a reviewer can verify empirically, not one that has to be taken on faith in the "
+    "model.")
 add_para(doc,
-    "Put together: clinical AI deployment, mandated data interoperability, and demand for auditable "
-    "uncertainty are each independently accelerating right now, and the space between the second and "
-    "third trend -- interoperable, but not yet verifiably trustworthy -- is precisely the open problem "
-    "this report and its accompanying toolkit are built to make tractable.")
+    "Put together: clinical AI deployment, structural interoperability mandates, and the case for "
+    "auditable uncertainty each stand on independently verifiable ground, and the space between the "
+    "second and third -- interoperable, but not yet verifiably trustworthy -- is the open problem this "
+    "report and its accompanying toolkit are built to make tractable.")
+
+add_para(doc,
+    "Sources for this section: "
+    "[FDA-AI-SaMD] U.S. FDA, \"Artificial Intelligence in Software as a Medical Device\" and the "
+    "AI/ML-Based SaMD Action Plan, fda.gov/medical-devices/software-medical-device-samd. "
+    "[McMahan17] H. B. McMahan et al., \"Communication-Efficient Learning of Deep Networks from "
+    "Decentralized Data,\" AISTATS 2017. "
+    "[Hard18] A. Hard et al., \"Federated Learning for Mobile Keyboard Prediction,\" 2018 "
+    "(arXiv:1811.03604). "
+    "[FLamby22] J. O. du Terrail et al., \"FLamby: Datasets and Benchmarks for Cross-Silo Federated "
+    "Learning in Realistic Healthcare Settings,\" 2022 (arXiv:2210.04620). "
+    "[ONC-Cures] Office of the National Coordinator for Health IT, \"Cures Act Final Rule,\" "
+    "healthit.gov/regulations/cures-act-final-rule; Federal Register, 21st Century Cures Act: "
+    "Interoperability, Information Blocking, and the ONC Health IT Certification Program, 2020. "
+    "[TEFCA] ONC Recognized Coordinating Entity (The Sequoia Project), rce.sequoiaproject.org/tefca. "
+    "[EHDS25] Regulation (EU) 2025/327 of the European Parliament and of the Council on the European "
+    "Health Data Space, Official Journal of the European Union, 5 March 2025.",
+    italic=True, size=9, color=MUTED)
 
 page_break(doc)
 
@@ -377,11 +459,11 @@ add_heading(doc, "4.1 IRB review and the Common Rule", level=2)
 add_para(doc,
     "In the United States, essentially any use of data involving human subjects for research -- "
     "including a purely retrospective, secondary analysis of existing clinical records -- falls under "
-    "the Common Rule (45 CFR 46) and requires review by an Institutional Review Board (IRB). Even when "
-    "a researcher believes an analysis poses minimal risk and may qualify for an exemption, that "
-    "determination itself has to be made by the IRB, not assumed by the researcher. This review exists "
-    "for good reason -- it is the primary safeguard for patient rights and welfare in research -- but "
-    "it also means that before a single row of data can be analyzed, a formal, often multi-week "
+    "the Common Rule (45 CFR 46) and requires review by an Institutional Review Board (IRB) [45CFR46]. "
+    "Even when a researcher believes an analysis poses minimal risk and may qualify for an exemption, "
+    "that determination itself has to be made by the IRB, not assumed by the researcher. This review "
+    "exists for good reason -- it is the primary safeguard for patient rights and welfare in research "
+    "-- but it also means that before a single row of data can be analyzed, a formal, often multi-week "
     "institutional process has to run its course, and it has to run separately at every participating "
     "institution in a multi-site study.")
 
@@ -392,20 +474,20 @@ add_para(doc,
     "institution requires patient authorization, a waiver, or de-identification meeting one of two "
     "recognized standards: Safe Harbor (removing eighteen specific categories of identifier) or "
     "Expert Determination (a qualified statistician formally certifies that re-identification risk is "
-    "very small). Both routes require real expertise and institutional sign-off, not just deleting a "
-    "name column. Moving data between institutions at all typically also requires a negotiated Data "
-    "Use Agreement (DUA) -- a legal contract specifying permitted uses, security controls, and "
-    "publication rights -- and DUAs are usually negotiated per pair of institutions, which is a large "
-    "part of why genuinely multi-site datasets are so much rarer than single-site ones: a four-hospital "
-    "study does not need one DUA, it potentially needs up to six.")
+    "very small) [HIPAA-Deident]. Both routes require real expertise and institutional sign-off, not "
+    "just deleting a name column. Moving data between institutions at all typically also requires a "
+    "negotiated Data Use Agreement (DUA) -- a legal contract specifying permitted uses, security "
+    "controls, and publication rights -- and DUAs are usually negotiated per pair of institutions, "
+    "which is a large part of why genuinely multi-site datasets are so much rarer than single-site "
+    "ones: a four-hospital study does not need one DUA, it potentially needs up to six.")
 
 add_heading(doc, "4.3 Even \"open\" datasets are usually credentialed, not public", level=2)
 add_para(doc,
     "Some of the best-known multi-institution clinical datasets are still gated behind a "
-    "credentialing process rather than being truly public downloads. PhysioNet's MIMIC-IV and eICU "
-    "Collaborative Research Database, for example, require a signed data use agreement and completion "
-    "of human-subjects-research training (commonly the CITI \"Data or Specimens Only Research\" "
-    "course) before an individual researcher can download the data -- a reasonable and proportionate "
+    "credentialing process rather than being truly public downloads. PhysioNet's MIMIC-IV, for "
+    "example, requires a signed PhysioNet Credentialed Health Data Use Agreement and completion of "
+    "human-subjects-research training (the CITI \"Data or Specimens Only Research\" course) before an "
+    "individual researcher can download the data [PhysioNet-MIMIC] -- a reasonable and proportionate "
     "safeguard, but a real barrier for a live, drop-in teaching setting where attendees cannot be "
     "expected to complete a multi-day credentialing process in advance.")
 
@@ -433,11 +515,26 @@ add_table(doc,
 add_para(doc,
     "This is what makes the dataset in Section 5 genuinely unusual. It was donated to the public UCI "
     "Machine Learning Repository in 1988-89 -- more than a decade before the HIPAA Privacy Rule was "
-    "finalized (2000) and took effect (2003) -- and released with the explicit intent of open reuse. "
-    "A comparable four-hospital dataset collected today would, even with every institution fully "
-    "willing to share, face a materially higher bar to public release than this one did. That "
-    "historical accident is precisely why a workshop can hand attendees real, multi-institution "
-    "patient data with zero credentialing, and it is the direct bridge into the next section.")
+    "published (December 2000) and before covered entities were required to comply with it (April "
+    "2003) [HIPAA-Dates] -- and released with the explicit intent of open reuse. A comparable "
+    "four-hospital dataset collected today would, even with every institution fully willing to share, "
+    "face a materially higher bar to public release than this one did. That historical accident is "
+    "precisely why a workshop can hand attendees real, multi-institution patient data with zero "
+    "credentialing, and it is the direct bridge into the next section.")
+
+add_para(doc,
+    "Sources for this section: "
+    "[45CFR46] U.S. Dept. of Health and Human Services, Office for Human Research Protections, "
+    "\"Federal Policy for the Protection of Human Subjects (45 CFR 46),\" hhs.gov/ohrp. "
+    "[HIPAA-Deident] U.S. HHS Office for Civil Rights, \"Guidance Regarding Methods for "
+    "De-identification of Protected Health Information in Accordance with the HIPAA Privacy Rule,\" "
+    "hhs.gov/hipaa/for-professionals/special-topics/de-identification. "
+    "[HIPAA-Dates] U.S. HHS, Standards for Privacy of Individually Identifiable Health Information, "
+    "Federal Register, 28 December 2000 (final rule); general compliance date 14 April 2003. "
+    "[PhysioNet-MIMIC] PhysioNet, \"MIMIC-IV\" data-access requirements (PhysioNet Credentialed "
+    "Health Data Use Agreement 1.5.0 and CITI \"Data or Specimens Only Research\" training), "
+    "physionet.org/content/mimiciv.",
+    italic=True, size=9, color=MUTED)
 
 page_break(doc)
 
@@ -653,8 +750,8 @@ add_heading(doc, "6. Methods of Interoperability: Choosing a Standard", level=1)
 add_para(doc,
     "Section 5 relied on a lucky historical accident: four hospitals happened to fill out the same "
     "paper case-report form. A real curation pipeline built today does not get to rely on luck -- it "
-    "has to deliberately choose a data standard. This section surveys the realistic options and "
-    "recommends one, and then explains exactly what adopting it does, and does not, solve.")
+    "has to deliberately choose a data standard. This section surveys the realistic options and lays "
+    "out exactly what adopting any of them does, and does not, solve.")
 
 add_heading(doc, "6.1 Interoperability has levels, and most mandates stop at the easy ones", level=2)
 add_para(doc,
@@ -695,46 +792,31 @@ add_table(doc,
          "but the correct standard once imaging enters a curation pipeline"],
     ])
 
-add_heading(doc, "6.3 Recommendation", level=2)
+add_heading(doc, "6.3 What standardization can and cannot buy you", level=2)
 add_para(doc,
-    "For this workshop's specific problem -- tabular, structured, multi-site observational data, "
-    "aimed at pooled or federated statistical analysis rather than a real-time clinical transaction "
-    "-- the OMOP Common Data Model is the standard best matched to the goal. Its entire design purpose "
-    "is forcing every participating site to map its local coding of, say, \"chest pain type\" or "
-    "\"cholesterol\" onto the same standard concept before analysis, which is exactly the step that "
-    "would have flagged (though not eliminated -- see below) the kind of silent semantic drift "
-    "Sections 5, 7 and 8 spend most of this report measuring after the fact. OMOP is not a niche "
-    "proposal: the OHDSI research network built on it already spans a very large, multi-national "
-    "federation of observational health databases used for exactly this kind of pooled and federated "
-    "study.")
+    "Table 6.1 is a starting point for that choice, not a verdict -- which standard (or combination) "
+    "fits a given curation pipeline depends on institutional context, existing vendor systems, and "
+    "whether the goal is live clinical exchange or pooled research analysis, and is a decision this "
+    "report leaves to the team building the pipeline rather than asserting on their behalf.")
 add_para(doc,
-    "FHIR remains the right choice for the transport and live-exchange layer -- it is the standard "
-    "actually named in current US and EU regulatory mandates (Section 3.3), and it is what a hospital "
-    "system's electronic health record will expose today. A realistic production recommendation is "
-    "therefore not \"OMOP instead of FHIR,\" but a two-layer stack: FHIR to move data out of clinical "
-    "systems, OMOP CDM (or an equivalent research-purpose common data model) as the harmonized "
-    "analytic layer built from what FHIR delivers.")
+    "What the report *can* say with confidence is the limit of what any of these standards buys you. "
+    "Adopting a common schema and a common vocabulary reduces, but does not eliminate, "
+    "measurement-process heterogeneity -- a hospital can code cholesterol to the correct standard "
+    "concept and still simply order that test less often than another hospital does, which reproduces "
+    "Switzerland's missingness pattern (Section 5.2) inside a perfectly standards-compliant pipeline. "
+    "No coding standard changes the fact that a tertiary referral centre sees a sicker, pre-selected "
+    "population either. That is why this toolkit's heterogeneity diagnostics (Section 5) and "
+    "conformal-coverage diagnostics (Sections 7-8) belong *downstream* of any standardization effort "
+    "as a verification step, not as a one-time substitute for one.")
 add_para(doc,
-    "The essential caveat, and the reason this recommendation does not make the rest of this report "
-    "unnecessary, is that adopting either standard is necessary but not sufficient. A common schema "
-    "and a common vocabulary reduce, but do not eliminate, measurement-process heterogeneity -- a "
-    "hospital can code cholesterol correctly to the right LOINC concept and still simply order that "
-    "test less often than another hospital does, which reproduces Switzerland's missingness pattern "
-    "(Section 5.2) inside a perfectly standards-compliant pipeline. No coding standard changes the "
-    "fact that a tertiary referral centre sees a sicker, pre-selected population either. That is why "
-    "this toolkit's heterogeneity diagnostics (Section 5) and conformal-coverage diagnostics "
-    "(Sections 7-8) belong *downstream* of any standardization effort as a mandatory verification "
-    "step, not as a one-time substitute for one.")
-add_para(doc,
-    "It is worth being explicit that the UCI dataset itself predates and does not use any of these "
-    "standards -- it is distributed as raw, fixed-format, per-site flat files. That is a feature for "
-    "this report's purposes, not a flaw: it shows what pre-standardization interoperability looked "
-    "like, and every figure in Section 5 is a direct, honest picture of what a modern common data "
-    "model would, and would not, have caught. Standardizing the format would have caught nothing "
+    "It is worth being explicit that the UCI dataset itself predates and does not use any of the "
+    "standards in Table 6.1 -- it is distributed as raw, fixed-format, per-site flat files. That is a "
+    "feature for this report's purposes, not a flaw: it shows what pre-standardization interoperability "
+    "looked like, and every figure in Section 5 is a direct, honest picture of what adopting a modern "
+    "standard would, and would not, have caught. Standardizing the format would have caught nothing "
     "about the true prevalence swing across sites (Table 5.1) -- that is real biology, not a coding "
-    "problem -- and would very likely have caught, or at least flagged, the `ca`/`thal` measurement "
-    "gap (Table 5.2), since a well-governed common-data-model pipeline typically reports per-site "
-    "concept-level completeness as a matter of course.",
+    "problem -- while a well-governed pipeline that tracks per-site data completeness by design would "
+    "plausibly have surfaced the `ca`/`thal` measurement gap (Table 5.2) earlier than this report did.",
     italic=True, color=MUTED)
 
 page_break(doc)
@@ -1249,15 +1331,75 @@ add_bullets(doc, [
     "hospital never touched during either development or the heterogeneity analysis itself) would "
     "strengthen the claim that the observed coverage drop generalizes beyond this specific "
     "four-hospital federation.",
-    "The interoperability-standards discussion in Section 6 is a recommendation, not an "
-    "implementation -- an OMOP CDM mapping of this exact dataset, with per-concept completeness "
-    "reported the way a real OHDSI network study would, would turn Section 6's argument from "
-    "reasoned advocacy into a second, standards-based measurement of the same heterogeneity story.",
+    "The interoperability-standards survey in Section 6 is descriptive, not implemented -- actually "
+    "mapping this dataset onto a common data model such as OMOP, with per-concept completeness "
+    "reported the way a real OHDSI network study would, would turn Section 6 from a comparison of "
+    "options into a second, standards-based measurement of the same heterogeneity story.",
 ])
 add_para(doc,
     "None of these are required to support the report's central claims -- each is a natural next "
     "increment, not a gap that undermines what is already demonstrated.",
     italic=True, color=MUTED)
+
+page_break(doc)
+
+# ==========================================================================
+# REFERENCES
+# ==========================================================================
+add_heading(doc, "References", level=1)
+add_para(doc,
+    "Every specific factual claim in this report that is not this project's own reproducible output "
+    "(Sections 5, 7, 8, 9) is backed by one of the sources below, each checked against a primary or "
+    "authoritative source (the originating agency, standards body, publisher, or peer-reviewed venue) "
+    "while preparing this report.")
+
+add_heading(doc, "Methods", level=2)
+add_numbered(doc, [
+    "A. N. Angelopoulos and S. Bates. \"Conformal Prediction: A Gentle Introduction.\" Foundations "
+    "and Trends® in Machine Learning, 16(4):494–591, 2023. DOI: 10.1561/2200000101. "
+    "(Preprint: arXiv:2107.07511, 2021.)",
+    "Y. Romano, M. Sesia, and E. Candès. \"Classification with Valid and Adaptive Coverage.\" "
+    "Advances in Neural Information Processing Systems 33 (NeurIPS 2020).",
+    "V. Vovk. \"Conditional Validity of Inductive Conformal Predictors.\" Proceedings of the Asian "
+    "Conference on Machine Learning (ACML 2012).",
+    "H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas. \"Communication-Efficient "
+    "Learning of Deep Networks from Decentralized Data.\" Proceedings of AISTATS 2017.",
+    "A. Hard et al. \"Federated Learning for Mobile Keyboard Prediction.\" 2018 (arXiv:1811.03604).",
+    "J. O. du Terrail et al. \"FLamby: Datasets and Benchmarks for Cross-Silo Federated Learning in "
+    "Realistic Healthcare Settings.\" 2022 (arXiv:2210.04620).",
+])
+
+add_heading(doc, "Dataset", level=2)
+add_numbered(doc, [
+    "R. Detrano, A. Jánosi, W. Steinbrunn, M. Pfisterer, J. J. Schmid, S. Sandhu, K. H. Guppy, "
+    "S. Lee, and V. Froelicher. \"International Application of a New Probability Algorithm for the "
+    "Diagnosis of Coronary Artery Disease.\" American Journal of Cardiology, 64(5):304–310, 1989. "
+    "DOI: 10.1016/0002-9149(89)90524-9.",
+    "UCI Machine Learning Repository. \"Heart Disease\" dataset (ID 45). "
+    "archive.ics.uci.edu/dataset/45/heart+disease.",
+])
+
+add_heading(doc, "Regulatory and Data-Access Policy (Sections 3-4)", level=2)
+add_numbered(doc, [
+    "U.S. Dept. of Health and Human Services, Office for Human Research Protections. \"Federal Policy "
+    "for the Protection of Human Subjects (45 CFR 46).\" hhs.gov/ohrp.",
+    "U.S. HHS Office for Civil Rights. \"Guidance Regarding Methods for De-identification of Protected "
+    "Health Information in Accordance with the HIPAA Privacy Rule.\" "
+    "hhs.gov/hipaa/for-professionals/special-topics/de-identification.",
+    "U.S. HHS. \"Standards for Privacy of Individually Identifiable Health Information.\" Federal "
+    "Register, 28 December 2000 (final rule); general compliance date 14 April 2003.",
+    "PhysioNet. \"MIMIC-IV\" data-access requirements (PhysioNet Credentialed Health Data Use "
+    "Agreement 1.5.0 and CITI \"Data or Specimens Only Research\" training). "
+    "physionet.org/content/mimiciv.",
+    "U.S. FDA. \"Artificial Intelligence in Software as a Medical Device\" and the AI/ML-Based SaMD "
+    "Action Plan. fda.gov/medical-devices/software-medical-device-samd.",
+    "Office of the National Coordinator for Health Information Technology. \"Cures Act Final Rule.\" "
+    "healthit.gov/regulations/cures-act-final-rule; Federal Register, 1 May 2020.",
+    "ONC Recognized Coordinating Entity (The Sequoia Project). \"Trusted Exchange Framework and "
+    "Common Agreement (TEFCA).\" rce.sequoiaproject.org/tefca.",
+    "Regulation (EU) 2025/327 of the European Parliament and of the Council on the European Health "
+    "Data Space. Official Journal of the European Union, 5 March 2025.",
+])
 
 page_break(doc)
 
