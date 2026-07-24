@@ -187,7 +187,7 @@ nb03 = nb([
        "We train on Cleveland, Hungary and the V.A., and keep **Switzerland** completely unseen — "
        "the classic external-validation scenario a curation pipeline must survive."),
     code("train_sites = ['cleveland', 'hungarian', 'va']\n"
-         "fed = federated.federated_averaging(sites, rounds=40, local_epochs=3,\n"
+         "fed = federated.federated_averaging(sites, rounds=200, local_epochs=3,\n"
          "                                    train_sites=train_sites, seed=0)\n"
          "viz.plot_fed_learning_curves(fed.history);\n"
          "global_model = fed.global_model"),
@@ -225,7 +225,7 @@ nb04 = nb([
     code(BOOT),
     md("## Train the federated model (holding out Switzerland)"),
     code("train_sites = ['cleveland', 'hungarian', 'va']\n"
-         "fed = federated.federated_averaging(sites, rounds=40, local_epochs=3,\n"
+         "fed = federated.federated_averaging(sites, rounds=200, local_epochs=3,\n"
          "                                    train_sites=train_sites, seed=0)\n"
          "model = fed.global_model\n"
          "alpha = 0.1"),

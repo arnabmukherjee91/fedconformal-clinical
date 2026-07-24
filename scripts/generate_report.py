@@ -1219,16 +1219,46 @@ add_para(doc,
     "something. FedAvg trains a shared softmax model across Cleveland, Hungary and the V.A. (holding "
     "Switzerland out entirely, to test genuine external validation) by having each site take a few "
     "local gradient steps and averaging the resulting weights, weighted by site size, every "
-    "communication round -- no patient-level data ever leaves its hospital.")
+    "communication round -- no patient-level data ever leaves its hospital. Table 9.1 documents the "
+    "exact model and optimization configuration behind every federated result in this report.")
+
+add_table_caption(doc, "Table 9.1 -- Model architecture and training configuration (disease-severity task)")
+add_table(doc,
+    ["Setting", "Value"],
+    [
+        ["Model class", "SoftmaxModel (fedconformal.federated) -- multinomial logistic regression: "
+         "a single linear layer, logits = X W + b, softmax output. No hidden layers."],
+        ["Trainable parameters", "Weight matrix W: 13 features x 5 classes = 65 weights, plus bias "
+         "vector b: 5 -- 70 parameters total"],
+        ["Loss function", "Multiclass cross-entropy (negative log-likelihood): "
+         "-mean( log( P[i, y_i] ) ) over patients i, softmax probability P"],
+        ["Optimizer", "Full-batch gradient descent, analytic gradient (no autograd, no momentum, "
+         "no Adam) -- theta <- theta - lr x gradient every local epoch"],
+        ["Learning rate", "0.3 (fixed, no schedule/decay)"],
+        ["L2 regularization", "1e-2, applied to the weight matrix only (not the bias)"],
+        ["Local epochs per round", "3 full-batch passes over each site's own data before its "
+         "weights are sent back to the server"],
+        ["Communication rounds", "200 -- chosen empirically: loss was still visibly declining at "
+         "round 40, and is essentially flat (changes in the 3rd decimal place) from round ~150 on"],
+        ["Cumulative local epochs", "600 per participating site (200 rounds x 3 local epochs)"],
+        ["Aggregation rule", "FedAvg: server-side weighted average of the three sites' returned "
+         "weight vectors, weighted by each site's patient count (n_k / total n)"],
+        ["Training sites (n)", "Cleveland (303), Hungary (294), V.A. (200) -- 797 patients total"],
+        ["Held-out site", "Switzerland (123) -- never included in training or averaging"],
+        ["Random seed", "0 (fixed, for exact reproducibility)"],
+    ])
 
 add_image(doc, "06_fed_curves.png",
-    "Figure 9.1 -- Per-site training loss across FedAvg communication rounds, 5-class disease task. "
-    "All three participating sites' losses fall together, confirming the federated procedure "
-    "converges. Produced by viz.plot_fed_learning_curves.")
+    "Figure 9.1 -- Per-site training loss across 600 cumulative local epochs (200 communication "
+    "rounds x 3 local epochs/round), 5-class disease task, using the configuration in Table 9.1. All "
+    "three participating sites' losses fall together and visibly flatten well before the end of "
+    "training, confirming the federated procedure has actually converged rather than merely still "
+    "improving when training was stopped. Produced by viz.plot_fed_learning_curves.")
 
 add_para(doc,
-    "The same convergence check, repeated on the chest-pain task, confirms FedAvg is not something "
-    "that happens to work only for the disease-severity target.")
+    "The same convergence check, repeated on the chest-pain task (60 rounds x 3 local epochs = 180 "
+    "cumulative epochs; otherwise identical configuration), confirms FedAvg is not something that "
+    "happens to work only for the disease-severity target.")
 add_image(doc, "cp/c02_fed_curves.png",
     "Figure 9.2 -- The same convergence check on the secondary chest-pain task, confirming FedAvg "
     "behaves consistently across two different targets. Produced by viz.plot_fed_learning_curves, "
@@ -1240,7 +1270,7 @@ add_para(doc,
     "prediction and the LAC score? scripts/compare_prediction_tasks.py runs the identical analysis "
     "-- label shift, covariate shift, cross-site conformal transfer, using the APS score this time -- "
     "on both the 5-class disease task and the 4-class chest-pain task, side by side.")
-add_table_caption(doc, "Table 9.1 -- The 5-class disease task and the 4-class chest-pain task, head to head")
+add_table_caption(doc, "Table 9.2 -- The 5-class disease task and the 4-class chest-pain task, head to head")
 add_table(doc,
     ["Metric", "Disease task (5-class)", "Chest-pain task (4-class)"],
     [
@@ -1262,7 +1292,7 @@ add_para(doc,
     "function.")
 
 add_image(doc, "compare/task_comparison.png",
-    "Figure 9.3 -- The comparison from Table 9.1, plotted: heterogeneity scores, average prediction-"
+    "Figure 9.3 -- The comparison from Table 9.2, plotted: heterogeneity scores, average prediction-"
     "set size, and worst-case cross-site coverage, disease task vs. chest-pain task, side by side. "
     "Produced by compare_prediction_tasks.plot_comparison.")
 
@@ -1270,7 +1300,7 @@ add_heading(doc, "9.3 The secondary task's own conformal pipeline, run in full",
 add_para(doc,
     "For completeness, the chest-pain task's own cross-site transfer matrix and set-size distribution "
     "-- the same diagnostics as Section 7, applied to a different label -- are included below rather "
-    "than only summarized in Table 9.1.")
+    "than only summarized in Table 9.2.")
 
 add_image(doc, "cp/c05_transfer_matrix.png",
     "Figure 9.4 -- Cross-site coverage transfer matrix for the chest-pain task (APS score). Produced "

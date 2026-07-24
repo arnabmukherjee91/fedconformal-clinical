@@ -191,18 +191,31 @@ def plot_divergence_matrix(mat_df, title, save=None, fmt="{:.2f}", cmap="Blues")
 # ----------------------------------------------------------------------------
 
 def plot_fed_learning_curves(history, save=None):
-    """FedAvg training loss per site across communication rounds."""
+    """FedAvg training loss per site across cumulative local epochs.
+
+    Every communication round performs a fixed number of local epochs per
+    site before the server averages weights; the x-axis is the cumulative
+    count of local epochs each site has completed ((round + 1) * local_epochs),
+    since that reflects actual training progress, not communication cost.
+    Falls back to plotting by round if an older history without an "epoch"
+    key is passed in.
+    """
     set_style()
     fig, ax = plt.subplots(figsize=(8, 4.4))
-    rounds = [h["round"] for h in history]
+    x_key = "epoch" if "epoch" in history[0] else "round"
+    xs = [h[x_key] for h in history]
     for s in SITES:
         key = f"loss_{s}"
         if key in history[0]:
-            ax.plot(rounds, [h[key] for h in history], lw=2,
+            ax.plot(xs, [h[key] for h in history], lw=2,
                     color=SITE_COLORS[s], marker=SITE_MARKERS[s], markersize=4,
-                    markevery=max(1, len(rounds) // 10), label=s.capitalize())
-    ax.set_title("Federated training (FedAvg): per-site loss by round")
-    ax.set_xlabel("communication round")
+                    markevery=max(1, len(xs) // 10), label=s.capitalize())
+    if x_key == "epoch":
+        ax.set_title("Federated training (FedAvg): per-site loss by epoch")
+        ax.set_xlabel("cumulative local epoch")
+    else:
+        ax.set_title("Federated training (FedAvg): per-site loss by round")
+        ax.set_xlabel("communication round")
     ax.set_ylabel("cross-entropy loss")
     ax.legend()
     fig.tight_layout()

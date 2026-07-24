@@ -228,7 +228,11 @@ def federated_averaging(
         new_theta = np.average(np.vstack(local_params), axis=0, weights=weights)
         global_model.set_params(new_theta)
 
-        round_log = {"round": r}
+        # Cumulative local epochs each site has completed by this point (every
+        # round performs exactly `local_epochs` local passes before averaging),
+        # tracked alongside `round` since it's the more meaningful training-
+        # progress axis: rounds measure communication cost, not work done.
+        round_log = {"round": r, "epoch": (r + 1) * local_epochs}
         for name in names:
             sd = sites[name]
             round_log[f"loss_{name}"] = _cross_entropy(global_model, sd.X, sd.y)
