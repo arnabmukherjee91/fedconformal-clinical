@@ -1,11 +1,9 @@
 # Beyond Interoperability — Workshop Materials
 
-Everything you need for the workshop: the report, the slides, and the
-hands-on notebooks.
+Everything you need for the workshop: the slides and the hands-on notebooks.
 
 ## Contents
 
-- `report/Beyond_Interoperability_Report.docx` — the written report
 - `report/Beyond_Interoperability_Slides.pptx` — the workshop slides
 - `notebooks/` — run these in order, `00` through `07`
 - `src/fedconformal/` — the toolkit the notebooks import (no install needed)
