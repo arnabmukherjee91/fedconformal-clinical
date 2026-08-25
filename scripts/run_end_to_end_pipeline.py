@@ -68,7 +68,7 @@ def main():
 
     print("\n== 3. Federated training (hold out Switzerland as external site) ==")
     train_sites = ["cleveland", "hungarian", "va"]
-    fed = federated.federated_averaging(sites, rounds=40, local_epochs=3,
+    fed = federated.federated_averaging(sites, rounds=200, local_epochs=3,
                                         train_sites=train_sites, seed=0)
     viz.plot_fed_learning_curves(fed.history, save=fig("06_fed_curves.png"))
     model = fed.global_model
