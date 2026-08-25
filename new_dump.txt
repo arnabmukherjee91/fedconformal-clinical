@@ -1,0 +1,494 @@
+=== SLIDE 1 ===
+TEXT: Beyond Interoperability || Hands-On Federated ML for Research Data Curation Infrastructure
+Technical Companion: Conformal Prediction for Site-Level Heterogeneity in Federated Clinical Data || UCI Heart Disease federation  ·  4 hospitals  ·  920 patients || Arnab Mukherjee
+Oklahoma State University — Center for Health Science, Tulsa || [Workshop / venue name and date — add here]
+NOTES: "Good morning, everyone, and welcome. My name is Arnab Mukherjee, I'm with the Center for Health Science at Oklahoma State University, and today we're going to spend the next few hours going Beyond Interoperability — building, by hand, the tools that tell us whether data moving between hospitals can actually be trusted once it gets there.
+
+"Here's how today is going to work. Roughly half of what we do will be me talking through ideas like this slide, and the other half will be hands-on — you, in a Jupyter notebook, running real code on real hospital data. We have eight notebooks, numbered 00 through 07, and I'll tell you exactly when to open each one as we go.
+
+"One thing I want to say clearly up front: you do not need a statistics background or a machine-learning background to follow toda
+
+=== SLIDE 2 ===
+TEXT: ABSTRACT || The one idea to remember from today || ▪  Getting data to move between hospitals is a solved problem. Getting that data to mean the same thing once it arrives is not — and that gap is what this whole workshop is about.
+▪  The worst kind of failure is a model that looks perfectly healthy on average while quietly getting one hospital's patients wrong — with nothing in its own output warn
+NOTES: 
+"There are three ideas we're going to build today. The first is interoperability — the ability to actually get a patient's data out of one hospital's computer system and into a form another system can read. The second is federated learning — a way for several hospitals to train one shared model together without a single patient record ever leaving its own hospital. And the third is conformal prediction — a way to check, with real numbers, whether that shared model can actually be trusted once you use it at a hospital it's never seen before.
+
+"Here's why you need all three, not just one. Interoperability gets the data moving, but it tells you nothing about whether you can trust it once it arrives. Federated learning lets you train across hospitals without needing to solve that trust questi
+
+=== SLIDE 3 ===
+TEXT: AGENDA || What this deck covers || ▪  1. Introduction
+▪  2. Challenges
+▪  3. Motivation
+▪  4. The Difficulty of Working With Real Clinical Data
+▪  5. Our Dataset: The UCI Heart Disease Federation || ▪  6. Methods of Interoperability
+▪  7. Why Conformal Prediction Helps
+▪  8. The Mathematics
+▪  9. Pipeline Walkthrough
+▪  References & Appendix || Beyond Interoperability  ·  Agenda || 3
+NOTES: "Quickly, here's the map. Sections one through four are scene-setting — I'll spend about twenty minutes convincing you this is a real, live problem, not something invented for a workshop slide. Section five introduces the dataset we use for everything — four real hospitals, nine hundred twenty patients. Sections six through eight build up our three core ideas one at a time: data standards, then conformal prediction, then the math underneath it. Section nine is where we put every piece together into one working pipeline and try to break it four different ways.
+
+"The next slide is your run sheet for the day — it tells you exactly which notebook to have open during which section. Keep it visible if you can."
+
+=== SLIDE 4 ===
+TEXT: AGENDA || Workshop notebook sequence || ▪  Run these in order, 00 → 07 — each takes roughly 10-20 minutes and produces some of the figures shown later in this deck.
+▪  Every notebook is a narrated walk-through of the same reusable code library — nothing is built twice, so what you see live is exactly what generated every slide.
+▪  Two extra clinical questions (Section 9's resting-ECG and exercise-
+NOTES: "This table is the map for the whole workshop — eight notebooks, 00 through 07, and I'll tell you exactly when to open each one. You'll build a conformal predictor on a simple model first, in about five lines of code, before we wrap that same idea around a more complicated federated model later, in notebook 04.
+
+"One more thing before we start: two of today's later results — the resting-ECG and exercise-angina findings in Section 9 — come from a standalone script, not a dedicated notebook. I'm telling you now so nobody goes looking for a notebook 08 that doesn't exist."
+
+=== SLIDE 5 ===
+TEXT: 1 || Introduction || Beyond Interoperability || 5
+NOTES: "Let's start with the first idea: interoperability. No notebook yet — this section is short, about five minutes — I just want to ask one question: data can already move between hospitals today, pretty easily. So why isn't that enough?"
+
+=== SLIDE 6 ===
+TEXT: INTRODUCTION || Moving data and trusting data are two different problems || ▪  “Interoperability” means two computer systems can send and read each other's data without a person manually translating in between. That part is largely solved today.
+▪  It says nothing about whether the data means the same thing once it lands somewhere new.
+▪  A concrete example: two hospitals can both have a “choleste
+NOTES: "Interoperability just means two systems can send each other data and both read it, without a person sitting in the middle translating by hand. Today, for the most part, that's a solved problem. Hospitals can send each other files, APIs exist, formats are standardized.
+
+"But here's what interoperability does not tell you: whether the data means the same thing once it arrives. Let me give you a concrete example. Two hospitals can both have a field called 'cholesterol.' Same column name, same units, same format. And they can still mean something completely different by it — because one hospital tests every single patient's cholesterol, and the other only orders the test when there's already a reason to suspect a problem. Same field, different meaning underneath.
+
+"Hold onto that example, bec
+
+=== SLIDE 7 ===
+TEXT: INTRODUCTION || Conformal prediction: a tool for catching that gap || ▪  Think of it as a wrapper you can put around any existing model — it turns a single confident guess into a short, honest list of plausible answers.
+▪  It comes with a promise: build enough of these lists, and the true answer will be somewhere on the list at least as often as you asked for (say, 90% of the time) — but only meas
+NOTES: "Here's the clearest way I can put this: conformal prediction is a magnifying glass, not a better model. It does not make the underlying model any smarter. What it does is take the model's blind spots — the places where it's wrong but doesn't know it's wrong — and makes those blind spots visible and measurable instead of invisible. That's the entire pitch of this workshop's second half, and in Section 7 I'll show you that exact pitch with real numbers from real hospitals."
+
+=== SLIDE 8 ===
+TEXT: INTRODUCTION || What you'll actually build today || ▪  The real UCI Heart Disease dataset, loaded from its four original hospitals: Cleveland, Hungary, Switzerland, and the V.A. Long Beach — not a cleaned-up, pre-packaged version.
+▪  A federated-learning simulator, built from scratch, so you can see exactly how hospitals train one shared model without ever pooling their patients' records.
+▪  A con
+NOTES: "Everything you'll touch today is built from scratch, in plain NumPy — no imported conformal-prediction library, no imported federated-learning library. I did that on purpose, so that every single line is something you can read and understand, not a black box you have to trust because a package did it for you.
+
+"By the end of this workshop you'll have four real hospitals' data, trained one shared model across three of them without moving a single patient record, built a conformal predictor from scratch, and used it to catch that model failing at a fourth hospital it never saw. That's the whole workshop, in one sentence."
+
+=== SLIDE 9 ===
+TEXT: 2 || Challenges || Beyond Interoperability || 9
+NOTES: "Still no notebook yet — I want to spend a few minutes making sure you feel, why this is genuinely important, before we start building things in Section 5. Let's go through five things that make this problem tricky."
+
+=== SLIDE 10 ===
+TEXT: CHALLENGES || Five things that make this genuinely hard || ▪  Telling apart a real difference between patient populations from a difference that's just how carefully something was measured — with no outside answer key to check against.
+▪  Silent failure: a model's own confidence score gives you no warning at all that it has wandered outside the population it was trained on.
+▪  You usually can't ju
+NOTES: "Let me walk through these five, because every one of them comes back later today, and I want you to recognize them when they do.
+
+"Number one and number two — telling real difference from measurement habit, and a model that fails silently — those two are exactly what conformal prediction, our third big idea, is built to solve. Number three — you can't just pool everyone's data — is exactly why federated learning, our second big idea, exists at all. Number four — same format doesn't mean same meaning — is what Section 6's tour of data standards is about. And number five — blended scorecards hide all of this — is why, for the rest of today, I am going to insist we look at results broken out by hospital, never just one blended average.
+
+"Remember these five numbers. We're going to answer eve
+
+=== SLIDE 11 ===
+TEXT: 3 || Motivation || Beyond Interoperability || 11
+NOTES: 
+
+=== SLIDE 12 ===
+TEXT: MOTIVATION || Why this matters right now, not just academically || 3.1  AI in medicine is moving faster than cross-hospital checking
+▪  A model that tests well at one hospital regularly does worse at another — different patient mix, different equipment, different measurement habits all play a role.
+▪  Regulators are catching up: the FDA's approach to AI-based medical software now expects tracking 
+NOTES: "Two things are happening in parallel right now, out in the real world. First, AI models in medicine are being deployed faster than anyone is checking whether they hold up across hospitals — a model that looks great at the hospital where it was built regularly does worse somewhere else, and regulators have noticed: the FDA now expects tracking of real-world performance after a model launches, not just one clean number measured before.
+
+"Second — federated learning, our second big idea, has gone from a research curiosity to something close to a necessity. The method we're using today, called FedAvg, was introduced back in 2017, and you're going to build it yourself, from scratch, in notebook 03. In healthcare specifically, pooling every hospital's patient records into one place is often jus
+
+=== SLIDE 13 ===
+TEXT: MOTIVATION || Rules require the data to move; they don't require it to mean the same thing || 3.3  Current data-sharing rules mandate that data CAN move, not that it means the same thing everywhere
+▪  In the US, federal rules now require standardized APIs for health data exchange, and a nationwide exchange network is already operating.
+▪  The EU has its own parallel regulation (the European Health
+NOTES: I want you to walk away with from this slide: today's regulations guarantee that health data CAN move between systems. Not one of them guarantees that the data means the same clinical fact once it gets there. That gap — the difference between 'can move' and 'can be trusted' — is exactly what our third idea, conformal prediction, exists to fill. It doesn't care what the data looks like, it doesn't care what kind of model you used, and it hands a reviewer a number they can go check for themselves, not something they have to take on faith. Sections 7 through 9 are entirely about that number."
+
+=== SLIDE 14 ===
+TEXT: MOTIVATION || The gap this workshop is built to close || Hospitals today can share data with each other. What's still missing is a checkable way to know whether that shared data can actually be trusted the same way once it arrives — this workshop's toolkit exists to make that trust something you can measure, not just assume. || Beyond Interoperability  ·  Motivation || 14
+NOTES: …
+
+"Read that slide with me: hospitals today can share data with each other. What's still missing is a checkable way to know whether that shared data can actually be trusted the same way once it arrives. That's the whole workshop, in one sentence."
+
+
+
+=== SLIDE 15 ===
+TEXT: 4 || The Difficulty of Working With Real Clinical Data || Beyond Interoperability || 15
+NOTES: 
+
+=== SLIDE 16 ===
+TEXT: REAL CLINICAL DATA || Stacking up the barriers to a public download || Beyond Interoperability  ·  Real Clinical Data || 17
+NOTES: "This table is just the last slide's argument, stacked up as hurdles. Read the last row with me: because of everything above it, most clinical data never becomes a public, reusable research dataset. That's the whole reason federated learning matters — it's not an academic exercise, it's often the only door that's actually open."
+
+=== SLIDE 17 ===
+TEXT: 5 || Our Dataset
+The UCI Heart Disease Federation
+HANDS-ON: notebooks 00, 01 || Beyond Interoperability || 19
+NOTES: "Alright — this is where we get hands-on. Everyone, please open notebooks/00_input_data_exploration.ipynb now. Take a second... good.
+
+"Run the first cell — it just imports our toolkit and loads all four hospitals' data into memory. Give it a moment to finish, you should see it print the patient counts... Everyone have output? Good, let's keep going."
+
+[Notebook 01, site_heterogeneity, comes in partway through this section — I'll tell you exactly when to switch, once we've talked about the two kinds of hospital-to-hospital difference.]
+
+=== SLIDE 18 ===
+TEXT: OUR DATASET || Why this particular dataset || ▪  Four real, independent hospitals all filled out the exact same intake form — so the data genuinely can move between them cleanly.
+▪  And yet, underneath that shared form, the four hospitals' patients and practices differ in ways that genuinely matter.
+▪  Every difference shown in this section is a real effect actually present in the data — nothing h
+NOTES: "Four reasons I picked this dataset for today. One: four real, independent hospitals filled out the exact same intake form, so the data genuinely does move cleanly between them — that's our first idea, interoperability, already satisfied. Two: underneath that shared form, these four hospitals' patients and practices differ in ways that actually matter — that's the heterogeneity we're about to go find. Three: every difference I show you in this section is a real effect, sitting in the data right now — I haven't constructed or exaggerated anything to make a point. And four: zero access barriers, thanks to that historical accident I just mentioned. Let's go find these differences ourselves."
+
+=== SLIDE 19 ===
+TEXT: OUR DATASET || Variable dictionary (UCI Heart Disease, ID 45) || Source: UCI Machine Learning Repository, archive.ics.uci.edu/dataset/45/heart+disease || Beyond Interoperability  ·  Our Dataset || 21
+NOTES: "This is a reference table — I'm not going to read every row, just skim it with me. Notice only two fields, ca and thal, are flagged missing here. Keep that in mind, because a couple of slides from now I'm going to show you a much bigger missingness problem — cholesterol, completely unrecorded at one entire hospital — and it won't show up in this table at all, because it's stored as a placeholder value, not a blank. Lesson for today: always look at what your data actually contains, not just what the documentation claims it contains."
+
+=== SLIDE 20 ===
+TEXT: OUR DATASET || Coded sub-values behind every categorical field || Beyond Interoperability  ·  Our Dataset || 22
+NOTES: "Also reference material — skim it, don't read it line by line. One thing worth flagging: one single patient in this dataset has a vessel count value outside this documented 0-to-3 range entirely. Almost certainly a decades-old data-entry slip, and it's been left in the data exactly as found. File that away — it's another small example of 'read what's actually there, not just what the codebook promises.'"
+
+=== SLIDE 21 ===
+TEXT: OUR DATASET || The four hospitals || ▪  The share of patients with any heart disease nearly triples across these four hospitals, from 36% to 94% — that's a genuine difference in who each hospital sees, not a data-entry problem. || Beyond Interoperability  ·  Our Dataset || 23
+NOTES: "Everyone, run the site-summary cell in notebook 00 right now, the one that follows this point in the notebook — you should see this exact table print out on your own screen, computed live from the four original hospital files. Don't just take my slide's word for it — watch it come out of your own code."
+
+=== SLIDE 22 ===
+TEXT: OUR DATASET || Patient counts and disease rates, by hospital || Disease prevalence swings from 36% at Hungary to 94% at Switzerland — a real difference in which patients each hospital sees, not a data-entry mistake. || Beyond Interoperability  ·  Our Dataset || 24
+NOTES: "This is notebook 00's first real figure — everyone should see this render on your own screen too. Look at that swing: 36% at Hungary, 94% at Switzerland. Hold that number in your head, because it's one half of a two-part story I'm about to tell you. This one is a genuinely different group of patients. The next slide shows you the other half — a difference that's not about the patients at all, just about what each hospital wrote down."
+
+=== SLIDE 23 ===
+TEXT: OUR DATASET || Two very different kinds of hospital-to-hospital difference || Beyond Interoperability  ·  Our Dataset || 25
+NOTES: "This table is the heart of the whole section, so let's slow down. Bottom row: a real difference between patient populations — that's biology. Top three rows: just differences in what each hospital happened to write down — that's measurement habit, not biology. Almost everything else in this section is evidence for one of these rows or the other.
+
+
+=== SLIDE 24 ===
+TEXT: OUR DATASET || How much is missing, and what cholesterol looks like when it is recorded || Left: the fraction of patients missing each measurement, by hospital — cholesterol's complete 100% gap at Switzerland stands out, alongside the much bigger, near-universal gap in vessel count and thalassemia results outside Cleveland. Right: cholesterol values where they were actually recorded (Switzerland h
+NOTES: "Look at Switzerland's cholesterol bar — completely full, 100%. Every single patient. Let's stop and ask why, because it's worth understanding, not just noting.
+
+"Here's what we know for certain: in the original source file, every Swiss patient's cholesterol is recorded as exactly zero. A living patient cannot have a cholesterol reading of zero — that's biologically impossible. So this isn't a real measurement, it's a stand-in for 'we don't have this value.'
+
+"Now, why would an entire hospital have zero cholesterol readings? Here's the most likely explanation, and I want to be honest that this is our best reading of the evidence, not something a document confirms outright: this dataset wasn't collected as one unified study. It's four separate hospital studies, run independently back in 198
+
+=== SLIDE 25 ===
+TEXT: OUR DATASET || A real difference in outcomes: how severe cases are, by hospital || ▪  Hungary is mostly “no disease”; Switzerland is almost entirely disease-positive. || Beyond Interoperability  ·  Our Dataset || 27
+NOTES: "Look at Hungary and Switzerland specifically: 64% of Hungary's patients have no disease at all; at Switzerland it's just 6.5%. That's genuine biology — real differences in which patients get referred to each hospital — not a coding mistake. Compare that to the measurement-habit rows we saw two slides ago — this is the other kind of difference."
+
+=== SLIDE 26 ===
+TEXT: OUR DATASET || The severity split, overall and by hospital || Left: the overall severity split across all 920 patients, plus a simplified any-disease-or-not summary. Right: the same breakdown, now split out by hospital — the previous table, drawn as a picture. || Beyond Interoperability  ·  Our Dataset || 28
+NOTES: "Same story as the last table, now as a picture. Quick question before we move on — which hospital would you guess is going to be hardest for one shared model to generalize to? Take a guess. ... Hold that guess — Section 7 is going to give you a very concrete answer."
+
+=== SLIDE 27 ===
+TEXT: OUR DATASET || A simple test: can you guess the hospital just from the patient's numbers? || ▪  Train a simple classifier whose only job is to guess which hospital a patient came from, using nothing but their clinical measurements — no diagnosis, no label. Every off-diagonal number here is how often it guesses right for that pair. 88%+ everywhere means: yes, easily. || Beyond Interoperability  ·  
+NOTES: "Here's a test I like: train the simplest possible model, and give it one job — guess which hospital a patient came from, using nothing but their vital signs and lab values. No diagnosis, no label, nothing about disease at all. Look at these numbers — 88% or better, for every single pair of hospitals. That's about as concrete a definition of 'these are different patient populations' as you'll ever get, and it doesn't even need to know who's sick."
+
+=== SLIDE 28 ===
+TEXT: OUR DATASET || The same finding, confirmed a second, independent way || Left: the previous table's guess-the-hospital accuracy, drawn as a heatmap. Right: a completely different, classifier-free way of measuring how differently shaped two hospitals' data is — applied here to maximum heart rate — pointing to the same conclusion. || Beyond Interoperability  ·  Our Dataset || 30
+NOTES: "I want to show you the same conclusion reached two completely different ways. On the left, a trained model guessing the hospital. On the right, no model at all — just directly comparing the shape of the raw numbers, for maximum heart rate, hospital by hospital. Two independent methods, same answer. That's what rules out 'maybe this is just one particular classifier being quirky.' This is notebook 01 — you're computing both of these yourselves right now."
+
+=== SLIDE 29 ===
+TEXT: OUR DATASET || Which measurements matter most for telling severity apart || Each panel is one continuous measurement, with five curves (one per severity level, lightest = no disease, darkest = critical). Where the curves pull apart from each other, that measurement is genuinely useful for predicting severity; where they sit on top of each other, it isn't. || Beyond Interoperability  ·  Our Dataset
+NOTES: "Look at these panels with me and tell me — which ones look most spread apart? ... Right, maximum heart rate and ST depression tend to separate the most cleanly. Those are our most informative continuous measurements, and we'll see them again."
+
+=== SLIDE 30 ===
+TEXT: OUR DATASET || One measurement, isolated by hospital instead of by severity || Maximum heart rate stood out on the previous slide as one of the more informative measurements for severity. Here it's the same measurement, but grouped by hospital instead — a cleaner look at how its typical range shifts from one hospital to the next. || Beyond Interoperability  ·  Our Dataset || 32
+NOTES: "Same measurement as the last slide, sliced the other way — by hospital instead of by severity. I want you to notice something important: both kinds of variation are happening at once in this data. It varies by outcome, and separately, it varies by hospital. Neither one explains the other away — they're both real, and they're both here."
+
+=== SLIDE 31 ===
+TEXT: OUR DATASET || The rest of the measurements, by severity || Average severity within each category, for all eight non-numeric measurements — chest-pain type, sex, blood sugar, exercise-induced chest pain, resting-ECG result, ST-segment slope, vessel count, and thalassemia test result. Several show a clear pattern: asymptomatic chest pain, exercise-induced chest pain, an abnormal ST slope, high bloo
+NOTES: "One panel worth a closer look: vessel count. Average severity climbs smoothly and steadily as the vessel count goes from 0 up to 3 — the cleanest 'more of this, worse the disease' pattern on this whole slide. That matters twice over, because vessel count is also the measurement with the worst missingness outside Cleveland — so it's reassuring to see that, where we do have it, it behaves exactly the way real cardiology knowledge says it should."
+
+=== SLIDE 32 ===
+TEXT: OUR DATASET || How every measurement relates to severity, at a glance || How strongly every pair of measurements (and the severity target) move together. Chest-pain type, exercise-induced chest pain, ST depression, maximum heart rate, and vessel count are the strongest, most reliable signals. || Beyond Interoperability  ·  Our Dataset || 34
+NOTES: "This confirms nothing we've seen in the last three slides was a fluke. Five measurements keep coming up as the strongest signals — chest-pain type, exercise-induced chest pain, ST depression, maximum heart rate, vessel count. Remember those five names — they'll reappear for the rest of today."
+
+=== SLIDE 33 ===
+TEXT: OUR DATASET || The same story, on a completely different question || Instead of disease severity, this predicts chest-pain type — a different clinical question, same four hospitals. Hungary sees mostly atypical chest pain; Switzerland is roughly 80% asymptomatic. The same hospital-to-hospital differences show up again here, confirming this isn't specific to one particular question. || Beyond Inter
+NOTES: "Let's pressure-test everything we've just found. Instead of disease severity, this slide predicts something completely different — chest-pain type — same four hospitals. And look: the same kind of hospital-to-hospital swing shows up again. That tells us this isn't a quirk of choosing 'disease severity' specifically — it's a property of these hospitals themselves. We'll use this exact chest-pain question again later, in Sections 8 and 9."
+
+=== SLIDE 34 ===
+TEXT: OUR DATASET || Recap: what makes this dataset unusually good for teaching this || ▪  Genuinely shareable — all four hospitals used the exact same 13-measurement intake form.
+▪  Genuinely different underneath, in two distinguishable ways: real differences between patient populations (disease rates ranging 36%-94%) and simple measurement-habit gaps (cholesterol, and much more severely, vessel count 
+NOTES: "Let's recap Section 5 before we move on. This dataset is genuinely shareable, genuinely different underneath in two distinguishable ways, small enough to run live today but large enough to be real, completely open, and everything we found replicates on a second clinical question. Good checkpoint here.
+
+[If running behind schedule: skip ahead to Section 7 now and only come back to Section 6 if time allows — Section 6 is background, not something attendees build by hand.]"
+
+=== SLIDE 35 ===
+TEXT: 6 || Methods of Interoperability
+Choosing a Standard || Beyond Interoperability || 37
+NOTES: "Quick detour before we get to the heart of the workshop. No notebook for this section — about ten minutes of background on data standards, then we're back to hands-on. If we're running behind, this is the section I'll compress."
+
+=== SLIDE 36 ===
+TEXT: INTEROPERABILITY || “Interoperable” isn't just one thing — it comes in degrees || ▪  Think of it as four separate levels: can the data move at all? Is its format standardized? Does a given value mean the same clinical fact everywhere? And is there shared agreement on the policies and workflows around it?
+▪  Most of today's regulations do a good job on the first two levels — getting data to move, i
+NOTES: "Our first idea, interoperability, isn't just one switch that's either on or off — it comes in four levels. Can the data move at all? Is the format standardized? Does a value mean the same clinical fact everywhere? And is there shared agreement on the policy and workflow around it? [Sketch these four on a board if you have one.]
+
+"Most regulations today are strong on the first two levels. The third level — meaning the same thing everywhere — is where every finding from Section 5 lives. It's the hardest one to legislate, and the easiest one to think you've already solved when you've really only gotten partway there."
+
+=== SLIDE 37 ===
+TEXT: INTEROPERABILITY || A quick tour of today's data-sharing standards || Beyond Interoperability  ·  Interoperability || 39
+NOTES: "Quick tour, not a deep dive. The one to remember is OMOP — it's genuinely built for exactly this use case, standardizing observational data across institutions. [If anyone in the room has hands-on OMOP experience, ask them how it handles the measurement-habit differences we saw in Section 5.]"
+
+=== SLIDE 38 ===
+TEXT: INTEROPERABILITY || What a shared format can fix, and what it can't || ▪  It reduces measurement-habit differences between hospitals, but it doesn't eliminate them.
+▪  A hospital can code cholesterol using the exact correct standard term and still simply order that test far less often than another hospital does — no format fixes that.
+▪  No shared format changes the fact that a specialist referral
+NOTES: "Here's the line I want you to remember from this whole section: a hospital can code cholesterol using the exact correct standard term, and still simply order that test less often than another hospital. No data standard fixes that. That's precisely why the checks we're about to build in Sections 7 and 8 have to sit downstream of adopting a shared format, as an ongoing habit — not as a one-time replacement for it.
+
+"Alright — background's done. Let's get to the real center of today: why we need conformal prediction at all."
+
+=== SLIDE 39 ===
+TEXT: 7 || Why Conformal Prediction Helps
+With Site-Level Heterogeneity
+HANDS-ON: notebooks 02, 04 || Beyond Interoperability || 41
+NOTES: "Everyone, pause what you're doing for a second — this is the center of the whole workshop, so I want your full attention here. Everything we've done up to now has been about noticing that hospitals differ. This section is about the tool that catches a model quietly failing because of it — that's conformal prediction, our third big idea.
+
+"In a moment I'll ask you to open notebook 02, conformal_basics — that's where you'll build a conformal predictor yourselves, in about five lines of code. Later in this section we'll come back to notebook 04, conformal_under_site_shift, for the headline result of the entire day. Stay with me for the next few slides first."
+
+=== SLIDE 40 ===
+TEXT: CONFORMAL PREDICTION || An everyday version of the problem || A weather forecaster who says “90% chance of rain” should be right about 9 days out of 10 whenever they say that. If they're only right 6 times out of 10, you stop trusting the number — even though every individual forecast still sounded confident. || A model that reports “92% confident” should work the same way. Conformal prediction is
+NOTES: "Before I show you a single number from our dataset, let me ask you something. Has anyone here ever stopped trusting a weather app, because it kept saying '90% chance of rain' and that just didn't feel right anymore? ... [Wait for a show of hands or a nod.] That instinct — checking a confident-sounding number against what actually happened — is exactly what conformal prediction does automatically, for a clinical model instead of a weather app. A forecaster who says 90% chance of rain should be right about nine days out of ten, whenever they say that number. If they're only right six times out of ten, you stop trusting the number, even though every individual forecast still sounded just as confident. A model that says 92% confident should work exactly the same way — and conformal prediction
+
+=== SLIDE 41 ===
+TEXT: CONFORMAL PREDICTION || The problem: a model can sound confident and still be wrong || ▪  A model says “92% chance of heart disease.” That number is not automatically trustworthy — nothing forces the model to actually be right 92% of the time.
+▪  Move that same model to a new hospital, and it often keeps sounding just as confident even while its real, checkable accuracy quietly drops.
+▪  The model
+NOTES: "Here's the single most important idea I want you to leave with today: confident, but wrong. A model says 92% confident. That number sounds precise, sounds trustworthy. But nothing forces it to actually be right 92% of the time — it's just what the model happens to output.
+
+"Let me ask the room: has anyone here taken a model, or honestly even just a rule of thumb, that worked well in one place, and used it somewhere new without double-checking it still applied? ... That's this exact failure mode. And here's the dangerous part — the model itself gives you no warning sign when it happens. It doesn't get quieter. It doesn't hedge. It just keeps sounding exactly as confident as before, while quietly being wrong more often.
+
+"And notice — this is a completely different problem from interoperabi
+
+=== SLIDE 42 ===
+TEXT: CONFORMAL PREDICTION || What conformal prediction actually gives you || ▪  Instead of one confident guess, it hands back a short list of plausible answers — for example, “the true severity is somewhere in {1, 2, 3}.”
+▪  That list comes with a promise attached: statements built this way are right at least 90% of the time, if you ask for 90%. Not a hope — a guarantee you can go check.
+▪  The guarant
+NOTES: "So here's the fix. Instead of one confident guess, conformal prediction hands back a short list of plausible answers — 'the true severity is somewhere in one, two, or three' — and that list comes with an actual promise attached: built this way, it's right at least 90% of the time, if you asked for 90%. Not a hope. A guarantee you can go check, empirically, with real data.
+
+"Everyone, open notebook 02, conformal_basics, now. Run the cells with me — you're about to build exactly this kind of list, from scratch, in about five lines of NumPy. Go ahead... Watch what comes out — that's a real, checkable prediction set, built by code you just ran yourself. We'll wrap this same idea around our federated model later, in notebook 04.
+
+"One more thing before we move on: the guarantee doesn't need th
+
+=== SLIDE 43 ===
+TEXT: CONFORMAL PREDICTION || Two ways an average can lie to you || Picture two patient groups. Left: no promise at all — the model could be right any fraction of the time. Middle: the promise holds only on average — the two groups' results are blended together, so one can quietly fail while the blended number still looks fine. Right: the promise holds for every group separately — nothing is hidden by b
+NOTES: "Look at these three pictures — this is a cartoon version of a real result I'm about to show you, so let's understand it here first, before the real numbers land. Left: no promise at all. Middle: the promise holds only on average — the two groups get blended together, so one group can quietly fail while the blended number still looks perfectly healthy. Right: the promise holds for every group separately, nothing hidden by blending.
+
+"Say this with me: 'meets the target on average' and 'meets the target everywhere' are two different claims — and only the second one is actually safe to act on. Keep that in your head for the next slide."
+
+=== SLIDE 44 ===
+TEXT: CONFORMAL PREDICTION || The headline result: watch the promise break || A conformal predictor is calibrated using only Cleveland's patients, then deployed at all four hospitals unchanged. It keeps its 90% promise at Cleveland, Hungary and the V.A. — and silently drops to 71% at Switzerland. The shaded band marks ordinary random wobble; 71% falls well outside it, so this is a real effect, not noise
+NOTES: "Everyone, this is it — this is the single most important figure in the entire workshop. Everything we've done all day has been building to this moment, so let's take our time.
+
+"If you have notebook 04 open, run the headline cell now and watch the numbers print with me live. Here's what we did: we set our threshold using only Cleveland's patients — nothing else. Then we deployed that exact same model and threshold at all four hospitals, including Switzerland, which this model has never seen in training or calibration.
+
+"Watch the numbers: Cleveland, 90.8%. Hungary, 90.8%. The V.A., 90.5%. And Switzerland... 70.7%. Look at that gap. The shaded band on this chart is ordinary random wobble — and 71% sits well outside it. This is not noise. This is a real, measurable failure, and we caught it
+
+=== SLIDE 45 ===
+TEXT: CONFORMAL PREDICTION || Why you have to check every site, not just the average || ▪  Calibrated only on Cleveland's 303 patients. Blend all four sites into one overall coverage number and it lands close to 90% — looking perfectly healthy. Only by checking Switzerland on its own does the 19-point failure become visible. || Beyond Interoperability  ·  Conformal Prediction || 47
+NOTES: "I want to say this slowly, because it's the practical lesson you should take back to your own work: if you blended all four hospitals into one overall coverage number, it would land close to 90% and look perfectly healthy. It would completely hide Switzerland's failure. The only way to catch it is to check every hospital on its own, never just the average. That check is cheap — you can bolt it onto any model already running in production, starting today."
+
+=== SLIDE 46 ===
+TEXT: CONFORMAL PREDICTION || Every hospital pair, tested at once || Each row is 'the hospital we set the threshold using'; each column is 'the hospital we then deploy at.' Reading straight down the diagonal (same hospital both times) is always healthy. Anything set using Cleveland, Hungary or the V.A. and then deployed at Switzerland lands around 70-72%; a threshold set using Switzerland instead over-d
+NOTES: "Let's not just take my word for the Cleveland case — let's check all sixteen possible pairings at once. Each row is 'which hospital we set the threshold with,' each column is 'which hospital we deployed at.' Straight down the diagonal is always healthy, that's using a hospital on itself.
+
+"Now look at the Switzerland column — anything set using Cleveland, Hungary, or the V.A. lands around 70 to 72% there. And here's a twist worth noticing: flip it around, set the threshold using Switzerland, and it doesn't fail elsewhere — it over-delivers, because Switzerland is the sickest population, so its threshold is looser everywhere else. These mismatches don't always fail in the scary direction, but they're still a mismatch worth catching every time."
+
+=== SLIDE 47 ===
+TEXT: 8 || The Mathematics
+And What Every Piece of Code Produces
+HANDS-ON: notebooks 02, 05 || Beyond Interoperability || 49
+NOTES: "Now let's look under the hood. I want to reassure you before we start: you do not need a statistics background for this section. Every formula I show you gets translated into a plain sentence right next to it — I just want you to recognize the same three steps every single time: score something, find a cutoff, draw a boundary. That's it, that's the whole section.
+
+"This is the densest part of the day, so we'll take it slowly, and there are a few slides near the end marked optional — totally fine to skip those if we're short on time. Notebook 02, revisited, and notebook 05, recreating_paper_figures, are our hands-on material here."
+
+=== SLIDE 48 ===
+TEXT: MATHEMATICS || What a prediction set actually looks like || Three real patients from this project's data, all truly "No disease," and the list of plausible answers the calibrated model actually returns for each — a confident single answer, a so-so 3-answer list, and a genuinely unsure 4-answer list. In that hardest case, the model's own best guess is wrong — yet the correct answer, "No disease," s
+NOTES: "Before I show you a single formula, look at these three real patients — not made-up examples, three actual people from our dataset, all of whom truly have no disease. Look at the third one, the hardest case: the model's own top guess is actually wrong there. And yet 'no disease,' the true answer, still made the list it returned.
+
+"That's not a coincidence — that's the entire point of the guarantee. Every formula I show you for the rest of this section is just 'how do we build a list with that exact property.' Keep this patient in mind as we go."
+
+=== SLIDE 49 ===
+TEXT: MATHEMATICS || The one assumption everything rests on || ▪  In plain terms: the patients used to set the threshold have to look statistically like the patients the model will later be asked to judge. Statisticians call this “exchangeability” — think of it as “no surprises between calibration and deployment.”
+▪  It does not require the data to follow a bell curve, or be cleanly separable, or come f
+NOTES: "Everything we've built rests on exactly one assumption. Statisticians call it 'exchangeability,' but don't worry about that word — here's the plain version: the patients you set your threshold on have to look statistically like the patients you'll later use it on. No surprises between calibration and deployment. That's it. It doesn't need bell-curve data, doesn't need any particular kind of model — about as weak an assumption as you can ask for, which is exactly why it works with anything.
+
+"And here's the punch line: this is exactly the assumption that moving a model between two very different hospitals can break outright. Cleveland's patients: 46% have any disease. Switzerland's: 94%. Those two groups simply don't look statistically alike — and I picked this dataset specifically because
+
+=== SLIDE 50 ===
+TEXT: MATHEMATICS || The recipe, in three steps: score, find a cutoff, draw the boundary || ▪  Step 1 — score: for every calibration patient, ask “how surprising was their true answer to the model?” (a nonconformity score, written s(x, y)). A confident, correct answer scores low; a confident, wrong answer scores high.
+▪  Step 2 — find a cutoff: sort those scores and take a percentile near the top, calle
+NOTES: "Three steps. Say them with me: score, cutoff, boundary. Step one, score — for every calibration patient, ask how surprising their true answer was to the model. Confident and correct scores low, confident and wrong scores high. Step two, find a cutoff — sort all those scores and take a percentile near the top, we call it q-hat. That little ceiling symbol and the plus-one in the formula are just a small correction so the promise is exact even with a few hundred patients, not just true on average over infinite repeats. Step three, draw the boundary — for a new patient, keep every answer whose surprise score doesn't clear that cutoff.
+
+"That's the whole recipe. Every remaining formula today is a variation on these same three steps. This exact cutoff calculation is what you ran yourselves in n
+
+=== SLIDE 51 ===
+TEXT: MATHEMATICS || The two scoring rules, worked through visually || Left (LAC): score a calibration patient → plot all the calibration scores as a histogram and mark the cutoff q̂ → for a new patient, keep every answer whose probability clears that bar. Right (APS): same three steps, but answers are sorted from most to least likely and added up until the running total crosses q̂. || Beyond Interopera
+NOTES: "Here are our two scoring rules, side by side. LAC on the left, APS on the right — same three-step recipe we just walked through, just a different way of measuring 'how surprising was this.' LAC is simpler and tends to give shorter lists on average. APS is a bit more adaptive — we use it for the multiclass secondary tasks in Section 9 because it sizes each patient's list more sensibly to how uncertain that specific patient actually is."
+
+=== SLIDE 52 ===
+TEXT: MATHEMATICS || LAC vs. APS, head to head on the same model || ▪  Same model, same calibration data, same 90% target — only the scoring rule changes. Both keep their promise; APS does it with slightly shorter lists on average, because it adapts list length to how uncertain each individual patient is rather than using one fixed rule for everyone. || Beyond Interoperability  ·  Mathematics || 54
+NOTES: "If you still have notebook 02 open, run both cells back to back — the LAC one, then the APS one — and watch what prints. Same model, same calibration patients, same 90% target, only the scoring rule changes. Both hit 90.3% coverage. But look at the list lengths — APS does it with slightly shorter lists on average. Here's the takeaway: the scoring rule you pick doesn't change whether the promise holds, only how efficiently it's kept."
+
+=== SLIDE 53 ===
+TEXT: MATHEMATICS || Not a toy example — this project's own numbers || Every one of these bars is a real calibration score from this project's own federated model, trained across Cleveland, Hungary and the V.A. The red line is the cutoff q̂ — everything to its left is what makes the 90% promise hold. || Beyond Interoperability  ·  Mathematics || 55
+NOTES: "I want to draw a sharp contrast with the last slide's clean, textbook illustrations — this histogram is messier, because it's real. Every bar here is an actual calibration score from our own federated model. The red line is the cutoff q-hat that goes on to produce Section 7's headline result. Not a toy example — this is genuinely the number our pipeline computed."
+
+=== SLIDE 54 ===
+TEXT: MATHEMATICS || How many patients do you need before you can trust the number? || Run the calibration step many times on small random samples and the achieved coverage bounces around — sometimes a little high, sometimes a little low, just from the luck of which patients happened to land in the sample. At 50 patients that bounce is wide; at 1,000 it's tight. Switzerland's 71% sits far outside even t
+NOTES: "A sharp question some of you are probably already asking: is Switzerland's 71% real, or just noise from a smallish calibration set? Let's answer that directly. Run the calibration step over and over on small random samples, and the achieved coverage bounces around a bit — just from the luck of the draw. At 50 patients, that bounce is wide. At 1,000, it's tight. Now — even generously, at Cleveland's own scale of 303 patients, 71% sits far outside any realistic bounce. That's how we know Switzerland's result is a genuine site effect, not sampling noise. [This comes from a nearly century-old statistical result — Vovk, 2012 — but nobody needs the name to follow the argument, just the picture.]"
+
+=== SLIDE 55 ===
+TEXT: MATHEMATICS || The same reassurance, at a much bigger scale || The same bounce-from-sample-size idea, now shown at the much larger scales used in the original paper (100, 1,000, and 10,000 calibration patients) — the spread narrows sharply as the sample grows. Recreation of Angelopoulos & Bates (2022), Figure 11. || Beyond Interoperability  ·  Mathematics || 57
+NOTES: "Same idea as the last slide, just zoomed out to a much bigger scale — 100, 1,000, and 10,000 calibration patients. Watch how sharply that spread narrows. [If anyone's silently thinking '303 patients is already plenty,' this is the slide that answers them — at these bigger scales, the bounce basically disappears.]"
+
+=== SLIDE 56 ===
+TEXT: MATHEMATICS || Coverage alone isn't the whole story || ▪  There's a cheap, useless way to hit 90% coverage: always return every possible answer. Technically correct, completely unhelpful to a clinician.
+▪  A genuinely useful list is short when the model is confident and long when it's genuinely unsure — and it should visibly grow at hospitals where that particular patient's outcome is harder to ca
+NOTES: "Quick thought experiment: what's the cheapest possible way to hit 90% coverage, guaranteed? ... Just always return every possible answer. Technically correct. Completely useless to a clinician. So coverage by itself isn't the whole story — a genuinely useful list is short when the model's confident and long when it's genuinely unsure.
+
+"There's a second, subtler failure too: one overall coverage number can be right on average while being badly wrong for one specific diagnosis. Concrete example, from our own chest-pain results — the rarest true diagnosis, typical angina, only 23 patients — is covered just 26% of the time against a 90% promise. Invisible in the overall number. Let's look at both of these side by side on the next slide."
+
+=== SLIDE 57 ===
+TEXT: MATHEMATICS || Two more things worth checking, side by side || Left: how long the returned lists are, by hospital (disease task) — longer lists at a hospital mean the model is systematically less sure about that hospital's patients. Right: coverage broken out by true chest-pain diagnosis — the rarest diagnosis (typical angina, 23 patients) is covered only 26% of the time, a failure the overall 90%
+NOTES: "Two independent failure modes, deliberately side by side. On the left: how long the lists are, by hospital — longer lists at a hospital mean the model itself is less sure about that hospital's patients, visible even before you check coverage at all. On the right: that 26% number from the last slide, now as a picture — coverage broken out by true diagnosis. Both of these matter directly if your pipeline serves smaller, under-represented patient groups."
+
+=== SLIDE 58 ===
+TEXT: MATHEMATICS || The same trick works well beyond classification || ▪  The three-step recipe from earlier — score how surprising something is, find a cutoff, use the cutoff to draw a boundary — isn't specific to picking from a list of diagnoses.
+▪  Predicting a number instead of a category (e.g. a lab value)? Take a fitted range and widen it by exactly the cutoff amount to reach the same guarantee.
+
+NOTES: "Quick note before the next three slides: they're optional depth, using small made-up examples exactly like the original paper does, not run on our own patients. Perfectly fine to skip these if we're tight on time — I'm telling you now so nobody thinks there's a missing notebook they were supposed to run. The point of these three is just: this recipe — score, cutoff, boundary — isn't specific to picking a diagnosis from a list. It works for a numeric prediction, for a single best-guess number, and even inside a full Bayesian model."
+
+=== SLIDE 59 ===
+TEXT: MATHEMATICS || The same trick, applied to numbers instead of categories || Left: a fitted range of likely numeric values (dashed) widened by the cutoff amount to reach the guarantee (solid). Right: a single best-guess number with a symmetric widened band around it. Both are made-up illustrative examples, recreating Angelopoulos & Bates (2022), Figures 6 and 8. || Beyond Interoperability  ·  Mathem
+NOTES: "Same 'widen by the cutoff amount' idea, now applied outside classification entirely. Left, a numeric range. Right, a single best-guess number with a band around it. [Most relevant if anyone in the room mainly works with numbers — lab values, dosages, wait times — rather than categories.]"
+
+=== SLIDE 60 ===
+TEXT: MATHEMATICS || The same trick, inside a Bayesian model || Instead of a category list or a numeric range, the returned answer is a region: every outcome whose estimated probability clears a threshold. Made-up illustrative example, recreating Angelopoulos & Bates (2022), Figure 9. || Beyond Interoperability  ·  Mathematics || 62
+NOTES: "Last of our three generalization examples, and a good closing point for this whole section: score, cutoff, boundary really is one general-purpose trick. It's not something invented just for picking between diagnoses — it works here too, inside a full Bayesian model."
+
+=== SLIDE 61 ===
+TEXT: 9 || Pipeline Walkthrough
+and Justification: Is This Enough?
+HANDS-ON: notebooks 03, 04, 06, 07 || Beyond Interoperability || 63
+NOTES: "Alright — we've built all three ideas separately: interoperability got us a shared, comparable dataset; conformal prediction gave us a way to check trust; and in a moment we're going to build federated learning too, the piece that lets hospitals train together without pooling data. This section puts all three together into one real pipeline, start to finish, and then we stress-test it four different ways to make sure our headline finding wasn't a fluke of one particular dataset choice.
+
+"Notebook 03, federated_training, then notebook 04 again, revisited, are our core hands-on material here. Notebooks 06 and 07 cover the robustness checks later in this section."
+
+=== SLIDE 62 ===
+TEXT: PIPELINE — TRAINING || How the hospitals train one shared model together || ▪  One shared model learns to weigh each of the 13 patient measurements and combine them into a severity guess — nothing fancier than a weighted combination, about 70 numbers total, small enough to print out and read.
+▪  Each round, the server sends the current shared model out to the three training hospitals — Cleveland, 
+NOTES: "Everyone, open notebook 03, federated_training, now. This is our second big idea, built from scratch, live. Let's read the first cell together before running it.
+
+"Here's what's about to happen: one shared model — about 70 numbers total, small enough to print out and actually read — gets sent out to three training hospitals: Cleveland, Hungary, the V.A. Patient records themselves never leave their hospital. Only those 70 numbers travel. Each hospital nudges its own copy slightly, using only its own patients. Then the server averages the three nudged copies back into one, weighted by how many patients each hospital contributed.
+
+"Go ahead and run the training cell now — it repeats that whole cycle 200 times. While it runs, notice: Switzerland is deliberately left out of training entirely. 
+
+=== SLIDE 63 ===
+TEXT: PIPELINE — TRAINING || Confirming the training actually finished learning || Each line is one hospital's error rate as training progresses. All three are still dropping visibly early on and go essentially flat by round ~150 — a sign that training ran long enough to settle, rather than being cut off partway through. || Beyond Interoperability  ·  Pipeline — Training || 65
+NOTES: "Your training cell should have produced a chart like this one — let's check it together. Each line is one hospital's error rate. Notice they're all still dropping early on, and go essentially flat around round 150. That flat tail is what tells us training ran long enough to actually settle, rather than being cut off partway through. If your curves look like this, training worked."
+
+=== SLIDE 64 ===
+TEXT: PIPELINE — TRAINING || Same check, a completely different prediction target || The identical training setup, now predicting chest-pain type instead of disease severity. Same settling-down pattern — a sign this behavior is a property of the method, not a coincidence specific to one target. || Beyond Interoperability  ·  Pipeline — Training || 66
+NOTES: "Same exact check, but for a completely different question — chest-pain type instead of disease severity. This comes from notebook 06, later in the day. Same settling-down pattern. That's how we know this is a property of the method itself, not a coincidence specific to one target."
+
+=== SLIDE 65 ===
+TEXT: PIPELINE — TRAINING || Does sharing models beat pooling all the data? || ▪  “Pooled” means a hypothetical model trained as if every patient record could sit in one place — the comparison this project is not allowed to run in a real hospital setting, only here as a reference point. The shared model trained without ever pooling data lands within a point of it everywhere — the privacy-preserving appr
+NOTES: "Let's answer the question everyone's probably wondering: does this privacy-preserving approach actually cost us anything? Look at this table with me — 'pooled' here means the hypothetical version where every patient record sits in one place, which we're never actually allowed to do in a real hospital setting. Compare the two columns: Cleveland, 60.7% versus 61.1%. Hungary, 71.1% versus 70.7%. The V.A., 44.0% versus 44.0%, identical. Federated training, without ever pooling a single patient record, lands within about a point of the pooled version everywhere. Say this plainly to the room: federated learning isn't a compromise here — it's close to a free win, and patient data never has to move.
+
+"One clarification before we continue: Switzerland's low accuracy here, around 21%, is a complete
+
+=== SLIDE 66 ===
+TEXT: PIPELINE — TRAINING || Under the hood: how each hospital's nudge is computed || ▪  In plain terms: after each hospital scores its own patients, it looks at how far off those scores were and adjusts its copy of the model a small step in the direction that would have made them less wrong. Repeated a few times, that's "training."
+▪  The formal version, for anyone who wants it: the loss is cross-entro
+NOTES: 
+
+"In plain terms, here's what a 'nudge' actually is: each hospital looks at how far off its guesses were, and adjusts its copy of the model a small step in the direction that would have made it less wrong. Do that a few times, that's training. For anyone who wants the exact formulas, they're on the slide, and every single line is something you can open and read in notebook 03. If we have time, let's open src/fedconformal/federated.py together and match these formulas to the actual code."
+
+=== SLIDE 67 ===
+TEXT: PIPELINE — CALIBRATION || Setting the threshold that makes the promise exact || ▪  Once the shared training rounds finish, the model's numbers are frozen — nothing about the model itself changes again from this point on.
+▪  Each training hospital's patients are then split in half: one half sets the threshold (calibration), the other half is kept aside purely to double-check it later — neither half
+NOTES: "Training is done, model's frozen — nothing about it changes from here on. Now we add our third idea, conformal prediction, on top. Each training hospital's patients get split in half — one half sets the threshold, the other half is set aside purely to double-check it later. Neither half touched training.That cutoff — q-hat — is the one number left to 'fit' once the model itself is done. And it's only trustworthy for patients who look statistically like the ones it was set on. Let's go put that exact claim to the test."
+
+=== SLIDE 68 ===
+TEXT: PIPELINE — DEPLOYMENT || The real test: an entirely unfamiliar hospital || ▪  The toughest version of the test: set the threshold using only Cleveland's patients (303 of them) — nothing from any other hospital.
+▪  Then deploy that frozen model and fixed threshold at every hospital, including Switzerland — a hospital the model never trained on and the threshold never saw.
+▪  No retraining, no adjus
+NOTES: "This is it — everyone, open notebook 04 again if you closed it, and find the final cell. This is the moment the entire workshop has been building to, so let's slow all the way down.
+
+"Here's the setup: set the threshold using only Cleveland's 303 patients — nothing else. Deploy that frozen model, unchanged, at every hospital, including Switzerland, which it has never trained on and never calibrated against. No retraining. No adjusting. No peeking at Switzerland's true answers first.
+
+"Run that final cell now, together with me, and watch the numbers print one hospital at a time. Cleveland... Hungary... the V.A.... and Switzerland. There it is — 70.7%. You just watched, with your own code, a model's promise silently break exactly where the patients stopped looking statistically alike. That'
+
+=== SLIDE 69 ===
+TEXT: PIPELINE — ROBUSTNESS || Is this specific to one clinical question? || ▪  Same full pipeline, run start to finish a second time on a completely different clinical question. Disease severity shows a bigger gap across hospitals — no surprise, since its prevalence swings further (36%–94%) than chest-pain type's does — but both questions keep every hospital close to the 90% promise. || Beyond Interope
+NOTES: "Fair question to ask at this point: did we just get lucky, picking disease severity as our one example? Let's check, using notebook 07. This runs the entire pipeline a second time, start to finish, on a completely different question — chest-pain type. Look at these two columns: nearly identical how-separable-are-the-hospitals score, about 0.93 both times, despite very different amounts of label imbalance. Say this plainly: that similarity tells us we're looking at a property of these hospitals themselves, not an accident of which clinical question we happened to ask."
+
+=== SLIDE 70 ===
+TEXT: PIPELINE — ROBUSTNESS || The same comparison, as a picture || The five numbers from the previous table, side by side, disease-severity vs. chest-pain-type. The same story shows up in both: real cross-hospital differences, but the 90% promise holds close to target everywhere. || Beyond Interoperability  ·  Pipeline — Robustness || 72
+NOTES: "Same five numbers, now as a picture. Before I move on, guess with me: which of the two questions do you think shows the bigger cross-hospital gap? ... Right, disease severity, because its prevalence swings further across our four hospitals."
+
+=== SLIDE 71 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || Running the full headline test a second time || Left: every hospital-pair combination for the chest-pain question — the same all-pairs test as Section 7's disease-severity version, just applied to a different diagnosis. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 73
+NOTES: "If you want to see the full parallel rather than just trust my summary table, this is notebook 06's own repeat of Section 7's two headline figures — same exact tests, different clinical question."
+
+=== SLIDE 72 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || Calibration scores and per-diagnosis coverage || Left: the chest-pain question's own calibration-score histogram — the same kind of chart shown earlier for disease severity. Right: coverage broken out by true chest-pain diagnosis — the rarest one (typical angina) is covered just 26% of the time. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 74
+NOTES: "Here's that 26% number from Section 8, back in its original context — coverage on the rare 'typical angina' diagnosis, only 23 patients. Remember this from earlier? Same finding, shown here where it actually comes from."
+
+=== SLIDE 73 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || How long are the returned lists, by hospital? || The chest-pain question's version of the list-length-by-hospital chart shown earlier for disease severity. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 75
+NOTES: "Rounds out the chest-pain question's full diagnostic set — same list-length chart we saw for disease severity back in Section 8."
+
+=== SLIDE 74 ===
+TEXT: PIPELINE — FURTHER TARGETS || Pushing further: two more clinical questions || ▪  Two questions (disease severity, chest-pain type) already show this isn't a fluke of one particular label — but could it still be a fluke of those two specific labels?
+▪  A companion script reruns the exact same federated-plus-conformal pipeline on two more columns from the same four hospitals: the resting-ECG result 
+NOTES: "Let's push one step further. Two questions already show this isn't a fluke of one particular label — but could it still be a fluke of those two specific labels? A companion script reruns our exact pipeline on two more columns: resting-ECG result, and whether the patient has exercise-induced chest pain. I picked these two specifically because they're almost completely filled in at every hospital — unlike some other columns that are missing for most patients at some hospitals, which would leave a question barely answerable there.
+
+"One flag: this pair runs from a standalone script, not a notebook — the one part of today without its own notebook. I'm telling you so nobody goes looking for it."
+
+=== SLIDE 75 ===
+TEXT: PIPELINE — FURTHER TARGETS || The worst-hospital promise, across four independent questions || ▪  Three of these four completely independent clinical questions show a real, double-digit-point promise failure at their hardest hospital. The size of each failure tracks how differently that specific measurement is distributed across hospitals — this isn't one generic side effect of combining these fou
+NOTES: "Quick question for the room before I reveal this table: of these four completely independent clinical questions, which one would you guess fails worst at its hardest hospital? ... Take a guess. [Reveal:] Disease severity, at 70.7%. But look — three of the four show a real, double-digit-point failure. The size of each failure tracks how differently that specific measurement is distributed by hospital — this isn't one generic side effect of combining these four hospitals, it's a real, question-by-question signal."
+
+=== SLIDE 76 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Third question: resting-ECG result || Left: how the resting-ECG reading is distributed by hospital — normal readings dominate at Hungary and Switzerland, while the V.A. leans toward one specific abnormality. Right: the training-settled-down check, same as before, for this question. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 78
+NOTES: "This third question, resting ECG, turns out to be the closest analogue to our original disease-severity failure — 74.5% worst-hospital coverage, not far behind the 70.7% headline number. Keep that in mind, it lands in two slides."
+
+=== SLIDE 77 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Resting-ECG: calibration scores and per-diagnosis coverage || Left: the resting-ECG question's own calibration-score histogram. Right: coverage broken out by true resting-ECG reading. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 79
+NOTES: "Same diagnostic battery we've run twice already, now applied to resting ECG — for anyone who wants to check every angle rather than just trust the headline table."
+
+=== SLIDE 78 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Resting-ECG: every hospital pair, and the headline test || Left: every hospital-pair combination for resting ECG — the V.A. is the hardest hospital to deploy at no matter which hospital set the threshold, landing 74-88% against the 90% promise. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task 
+NOTES: "Notice something here — the hardest hospital this time is the V.A., not Switzerland. Worth saying explicitly: the 'hardest hospital' isn't always the same one. It depends entirely on which specific measurement you're predicting."
+
+=== SLIDE 79 ===
+TEXT: PIPELINE — RESTING-ECG TASK || How long are the returned lists, by hospital? || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 81
+NOTES: "Completes the resting-ECG diagnostic set — same list-length chart as our earlier two questions."
+
+=== SLIDE 80 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Fourth question: exercise-induced chest pain || Left: how common exercise-induced chest pain is by hospital — roughly doubling from Hungary (30%) to the V.A. (65%), a milder version of the same kind of hospital-to-hospital swing seen for disease severity. Right: the training-settled-down check for this question. || Beyond Interoperability  ·  Pipeline — Exercise-
+NOTES: "Our fourth and final question — exercise-induced chest pain, a simple yes-or-no answer. It automatically routes through a simpler two-outcome version of the model, but every check downstream — scoring rule, coverage, list length — works exactly the same as the other three questions."
+
+=== SLIDE 81 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Exercise angina: calibration scores and per-diagnosis coverage || Left: the exercise-angina question's own calibration-score histogram. Right: coverage broken out by true yes/no answer. || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 83
+NOTES: "Same diagnostic battery, one more time, applied to this yes/no question."
+
+=== SLIDE 82 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Exercise angina: every hospital pair, and the headline test || Left: every hospital-pair combination for exercise angina — the weakest single pairing (threshold set at Hungary, deployed at Switzerland) lands at 83%, a real gap but a smaller one than resting ECG or disease severity showed. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond 
+NOTES: "The mildest of our four questions — 82.8% worst-hospital coverage. Still a genuine 7-point gap below our 90% promise, but noticeably smaller than resting ECG or disease severity."
+
+=== SLIDE 83 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || How long are the returned lists, by hospital? || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 85
+NOTES: "That completes our fourth and final robustness check. Let's zoom all the way back out for a second: four completely different clinical questions, same pipeline, same basic story every single time. That's not a coincidence — that's the finding."
+
+=== SLIDE 84 ===
+TEXT: PIPELINE || Where this stands, and what's honestly still missing || ▪  For what it set out to do, yes — every claim on these slides is backed by a figure anyone can reproduce by running the notebooks, and ten automated tests confirm the underlying math is implemented correctly.
+▪  It correctly tells apart real population differences from measurement gaps, and it shows the coverage promise breaking
+NOTES: "Let's be honest with each other about where this actually stands. For what it set out to do — yes. Every claim on these slides is backed by a figure any of you can reproduce, right now, by running these same notebooks, and ten automated tests confirm the underlying math is implemented correctly. It correctly tells apart real population differences from measurement gaps, it showed the coverage promise breaking with real numbers, and it held up across two different clinical questions and two different scoring rules.
+
+"But I want to be equally honest about what's still missing — deeper reliability checks, coverage broken out by patient subgroup and not just by hospital, a flag for whether a value was actually measured or just filled in, a real first attempt at fixing this rather than just de
+
+=== SLIDE 85 ===
+TEXT: REFERENCES || ▪  A. N. Angelopoulos & S. Bates. “Conformal Prediction: A Gentle Introduction.” FTML 16(4), 2023. — the main source behind Section 8's math, in a genuinely readable form.
+▪  Y. Romano, M. Sesia & E. Candès. “Classification with Valid and Adaptive Coverage.” NeurIPS 2020. — introduces the APS scoring rule used throughout this project.
+▪  H. B. McMahan et al. “Communication-Efficient 
+NOTES: "Quick pointer before we wrap up — if anyone wants to go deeper than we had time for today, start with Angelopoulos and Bates. It's written to be genuinely readable, no advanced statistics background assumed, and it's the source behind everything in Section 8."
+
+=== SLIDE 86 ===
+TEXT: Thank you || Questions & discussion
+fedconformal-clinical toolkit — Arnab Mukherjee
+Oklahoma State University — Center for Health Science, Tulsa
+NOTES: "Let's close the loop on where we started. Three ideas, remember? Interoperability — getting a patient's data out of one hospital's system and into a form another system can read. You saw today that solving that alone gets you nothing about whether the data can be trusted once it arrives.
+
+"Federated learning — several hospitals training one shared model together, without a single patient record ever leaving its own hospital. You built that yourselves this afternoon, in notebook 03, and saw it land within a point of the hypothetical pooled version on accuracy.
+
+"And conformal prediction — the piece that actually checks whether the shared model can be trusted somewhere new. You built that too, in notebook 02, and then watched its promise silently break, from 90% down to 70.7%, the moment we

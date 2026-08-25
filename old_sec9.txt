@@ -1,0 +1,159 @@
+=== SLIDE 63 ===
+TEXT: 9 || Pipeline Walkthrough
+and Justification: Is This Enough?
+HANDS-ON: notebooks 03, 04, 06, 07 || Beyond Interoperability || 63
+NOTES: "Alright — we've built all three ideas separately: interoperability got us a shared, comparable dataset; conformal prediction gave us a way to check trust; and in a moment we're going to build federated learning too, the piece that lets hospitals train together without pooling data. This section puts all three together into one real pipeline, start to finish, and then we stress-test it four different ways to make sure our headline finding wasn't a fluke of one particular dataset choice.
+
+"Notebook 03, federated_training, then notebook 04 again, revisited, are our core hands-on material here. Notebooks 06 and 07 cover the robustness checks later in this section."
+
+=== SLIDE 64 ===
+TEXT: PIPELINE — TRAINING || How the hospitals train one shared model together || ▪  One shared model learns to weigh each of the 13 patient measurements and combine them into a severity guess — nothing fancier than a weighted combination, about 70 numbers total, small enough to print out and read.
+▪  Each round, the server sends the current shared model out to the three training hospitals — Cleveland, Hungary, the V.A. Patient records themselves never leave any hospital; only the model's numbers travel.
+▪  Each hospital nudges its own copy slightly, using only its own patients, to make it fit its local data a bit better.
+▪  The server then averages the three nudged copies back into one, weighting each hospital by how many patients it contributed — a bigger hospital's nudge counts for more.
+▪  That whole cycle repeats 200 times. Switzerland is deliberately left out of training entirely, so it can later serve as a genuinely unseen hospital. || Beyond Interoperability  ·  Pipeline — Training || 64
+NOTES: "Everyone, open notebook 03, federated_training, now. This is our second big idea, built from scratch, live. Let's read the first cell together before running it.
+
+"Here's what's about to happen: one shared model — about 70 numbers total, small enough to print out and actually read — gets sent out to three training hospitals: Cleveland, Hungary, the V.A. Patient records themselves never leave their hospital. Only those 70 numbers travel. Each hospital nudges its own copy slightly, using only its own patients. Then the server averages the three nudged copies back into one, weighted by how many patients each hospital contributed.
+
+"Go ahead and run the training cell now — it repeats that whole cycle 200 times. While it runs, notice: Switzerland is deliberately left out of training entirely. Hold onto that, because it's about to matter a lot."
+
+=== SLIDE 65 ===
+TEXT: PIPELINE — TRAINING || Confirming the training actually finished learning || Each line is one hospital's error rate as training progresses. All three are still dropping visibly early on and go essentially flat by round ~150 — a sign that training ran long enough to settle, rather than being cut off partway through. || Beyond Interoperability  ·  Pipeline — Training || 65
+NOTES: "Your training cell should have produced a chart like this one — let's check it together. Each line is one hospital's error rate. Notice they're all still dropping early on, and go essentially flat around round 150. That flat tail is what tells us training ran long enough to actually settle, rather than being cut off partway through. If your curves look like this, training worked."
+
+=== SLIDE 66 ===
+TEXT: PIPELINE — TRAINING || Same check, a completely different prediction target || The identical training setup, now predicting chest-pain type instead of disease severity. Same settling-down pattern — a sign this behavior is a property of the method, not a coincidence specific to one target. || Beyond Interoperability  ·  Pipeline — Training || 66
+NOTES: "Same exact check, but for a completely different question — chest-pain type instead of disease severity. This comes from notebook 06, later in the day. Same settling-down pattern. That's how we know this is a property of the method itself, not a coincidence specific to one target."
+
+=== SLIDE 67 ===
+TEXT: PIPELINE — TRAINING || Does sharing models beat pooling all the data? || ▪  “Pooled” means a hypothetical model trained as if every patient record could sit in one place — the comparison this project is not allowed to run in a real hospital setting, only here as a reference point. The shared model trained without ever pooling data lands within a point of it everywhere — the privacy-preserving approach costs almost nothing in accuracy. || Beyond Interoperability  ·  Pipeline — Training || 67
+NOTES: "Let's answer the question everyone's probably wondering: does this privacy-preserving approach actually cost us anything? Look at this table with me — 'pooled' here means the hypothetical version where every patient record sits in one place, which we're never actually allowed to do in a real hospital setting. Compare the two columns: Cleveland, 60.7% versus 61.1%. Hungary, 71.1% versus 70.7%. The V.A., 44.0% versus 44.0%, identical. Federated training, without ever pooling a single patient record, lands within about a point of the pooled version everywhere. Say this plainly to the room: federated learning isn't a compromise here — it's close to a free win, and patient data never has to move.
+
+"One clarification before we continue: Switzerland's low accuracy here, around 21%, is a completely separate story from the coverage result we're about to see. Accuracy and coverage are different questions — accuracy is 'did it get the diagnosis right,' coverage is 'did the true answer make the list.' We're about to focus entirely on the second one."
+
+=== SLIDE 68 ===
+TEXT: PIPELINE — TRAINING || Under the hood: how each hospital's nudge is computed || ▪  In plain terms: after each hospital scores its own patients, it looks at how far off those scores were and adjusts its copy of the model a small step in the direction that would have made them less wrong. Repeated a few times, that's "training."
+▪  The formal version, for anyone who wants it: the loss is cross-entropy plus a small penalty that discourages overly large weights (L(θ) = −mean(log P[i, yᵢ]) + (λ/2)·‖W‖², λ = 1e-2, applied only to the weights, not the bias).
+▪  Weight gradient:  ∇W = Xᵀ(P − Y) / n + λW  — “P minus Y” is just “what the model guessed minus what actually happened,” averaged over patients.
+▪  Bias gradient:  ∇b = mean(P − Y, axis=0)  — the same idea, just for the model's baseline offset.
+▪  Update rule — the plainest possible version, no shortcuts or acceleration tricks:  θ ← θ − lr·∇L(θ), a fixed step size applied a few times per round at every hospital, so every line of it can be read and hand-verified rather than trusted as a black box. || Beyond Interoperability  ·  Pipeline — Training || 68
+NOTES: "[If the room is more clinical than technical, say plainly: 'feel free to skim this one, I'll keep it brief' — don't plow through it regardless of the room.]
+
+"In plain terms, here's what a 'nudge' actually is: each hospital looks at how far off its guesses were, and adjusts its copy of the model a small step in the direction that would have made it less wrong. Do that a few times, that's training. For anyone who wants the exact formulas, they're on the slide, and every single line is something you can open and read in notebook 03 — no hidden library, no black box. If we have time, let's open src/fedconformal/federated.py together and match these formulas to the actual code."
+
+=== SLIDE 69 ===
+TEXT: PIPELINE — CALIBRATION || Setting the threshold that makes the promise exact || ▪  Once the shared training rounds finish, the model's numbers are frozen — nothing about the model itself changes again from this point on.
+▪  Each training hospital's patients are then split in half: one half sets the threshold (calibration), the other half is kept aside purely to double-check it later — neither half was used to train the model in the first place.
+▪  The frozen model scores the calibration half only; those scores are what Section 8's “how surprising was this” recipe runs on.
+▪  The cutoff picked from those scores becomes q̂ — the one and only number this whole process still has to “fit” once the model itself is done training.
+▪  That cutoff is only trustworthy for patients who look statistically like the ones it was set on — which is exactly the assumption the next slide puts to the test. || Beyond Interoperability  ·  Pipeline — Calibration || 69
+NOTES: "Training is done, model's frozen — nothing about it changes from here on. Now we add our third idea, conformal prediction, on top. [Sketch this on a board if you can:] each training hospital's patients get split in half — one half sets the threshold, the other half is set aside purely to double-check it later. Neither half touched training. That cutoff — q-hat — is the one number left to 'fit' once the model itself is done. And it's only trustworthy for patients who look statistically like the ones it was set on. Let's go put that exact claim to the test."
+
+=== SLIDE 70 ===
+TEXT: PIPELINE — DEPLOYMENT || The real test: an entirely unfamiliar hospital || ▪  The toughest version of the test: set the threshold using only Cleveland's patients (303 of them) — nothing from any other hospital.
+▪  Then deploy that frozen model and fixed threshold at every hospital, including Switzerland — a hospital the model never trained on and the threshold never saw.
+▪  No retraining, no adjusting, no sneaking a look at Switzerland's answers first — just running the frozen model forward and applying the same fixed threshold everywhere.
+▪  The result: the 90% promise holds at Cleveland, Hungary and the V.A. — and quietly slips to 70.7% at Switzerland (see the table earlier in this section). The promise breaks exactly where Switzerland's patients stop looking statistically like Cleveland's. || Beyond Interoperability  ·  Pipeline — Deployment || 70
+NOTES: "This is it — everyone, open notebook 04 again if you closed it, and find the final cell. This is the moment the entire workshop has been building to, so let's slow all the way down.
+
+"Here's the setup: set the threshold using only Cleveland's 303 patients — nothing else. Deploy that frozen model, unchanged, at every hospital, including Switzerland, which it has never trained on and never calibrated against. No retraining. No adjusting. No peeking at Switzerland's true answers first.
+
+"Run that final cell now, together with me, and watch the numbers print one hospital at a time. Cleveland... Hungary... the V.A.... and Switzerland. There it is — 70.7%. You just watched, with your own code, a model's promise silently break exactly where the patients stopped looking statistically alike. That's the whole workshop, in one cell."
+
+=== SLIDE 71 ===
+TEXT: PIPELINE — ROBUSTNESS || Is this specific to one clinical question? || ▪  Same full pipeline, run start to finish a second time on a completely different clinical question. Disease severity shows a bigger gap across hospitals — no surprise, since its prevalence swings further (36%–94%) than chest-pain type's does — but both questions keep every hospital close to the 90% promise. || Beyond Interoperability  ·  Pipeline — Robustness || 71
+NOTES: "Fair question to ask at this point: did we just get lucky, picking disease severity as our one example? Let's check, using notebook 07. This runs the entire pipeline a second time, start to finish, on a completely different question — chest-pain type. Look at these two columns: nearly identical how-separable-are-the-hospitals score, about 0.93 both times, despite very different amounts of label imbalance. Say this plainly: that similarity tells us we're looking at a property of these hospitals themselves, not an accident of which clinical question we happened to ask."
+
+=== SLIDE 72 ===
+TEXT: PIPELINE — ROBUSTNESS || The same comparison, as a picture || The five numbers from the previous table, side by side, disease-severity vs. chest-pain-type. The same story shows up in both: real cross-hospital differences, but the 90% promise holds close to target everywhere. || Beyond Interoperability  ·  Pipeline — Robustness || 72
+NOTES: "Same five numbers, now as a picture — good place to pause. Before I move on, guess with me: which of the two questions do you think shows the bigger cross-hospital gap? ... Right, disease severity, because its prevalence swings further across our four hospitals."
+
+=== SLIDE 73 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || Running the full headline test a second time || Left: every hospital-pair combination for the chest-pain question — the same all-pairs test as Section 7's disease-severity version, just applied to a different diagnosis. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 73
+NOTES: "If you want to see the full parallel rather than just trust my summary table, this is notebook 06's own repeat of Section 7's two headline figures — same exact tests, different clinical question."
+
+=== SLIDE 74 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || Calibration scores and per-diagnosis coverage || Left: the chest-pain question's own calibration-score histogram — the same kind of chart shown earlier for disease severity. Right: coverage broken out by true chest-pain diagnosis — the rarest one (typical angina) is covered just 26% of the time. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 74
+NOTES: "Here's that 26% number from Section 8, back in its original context — coverage on the rare 'typical angina' diagnosis, only 23 patients. Remember this from earlier? Same finding, shown here where it actually comes from."
+
+=== SLIDE 75 ===
+TEXT: PIPELINE — CHEST-PAIN TASK || How long are the returned lists, by hospital? || The chest-pain question's version of the list-length-by-hospital chart shown earlier for disease severity. || Beyond Interoperability  ·  Pipeline — Chest-Pain Task || 75
+NOTES: "Rounds out the chest-pain question's full diagnostic set — same list-length chart we saw for disease severity back in Section 8."
+
+=== SLIDE 76 ===
+TEXT: PIPELINE — FURTHER TARGETS || Pushing further: two more clinical questions || ▪  Two questions (disease severity, chest-pain type) already show this isn't a fluke of one particular label — but could it still be a fluke of those two specific labels?
+▪  A companion script reruns the exact same federated-plus-conformal pipeline on two more columns from the same four hospitals: the resting-ECG result (three possible readings) and whether the patient has exercise-induced chest pain (yes/no).
+▪  Both were picked because they're almost fully filled in across every hospital (missing for only 2 patients and 55 patients respectively out of 920) — unlike a few other columns that are missing for the large majority of patients at some hospitals and would leave a question barely answerable there.
+▪  The yes/no question runs through a simpler two-outcome version of the model automatically — but every downstream check (scoring rule, coverage, list length) works exactly the same way regardless. || Beyond Interoperability  ·  Pipeline — Further Targets || 76
+NOTES: "Let's push one step further. Two questions already show this isn't a fluke of one particular label — but could it still be a fluke of those two specific labels? A companion script reruns our exact pipeline on two more columns: resting-ECG result, and whether the patient has exercise-induced chest pain. I picked these two specifically because they're almost completely filled in at every hospital — unlike some other columns that are missing for most patients at some hospitals, which would leave a question barely answerable there.
+
+"One flag: this pair runs from a standalone script, not a notebook — the one part of today without its own notebook. I'm telling you so nobody goes looking for it."
+
+=== SLIDE 77 ===
+TEXT: PIPELINE — FURTHER TARGETS || The worst-hospital promise, across four independent questions || ▪  Three of these four completely independent clinical questions show a real, double-digit-point promise failure at their hardest hospital. The size of each failure tracks how differently that specific measurement is distributed across hospitals — this isn't one generic side effect of combining these four hospitals, it's a real, question-by-question signal. || Beyond Interoperability  ·  Pipeline — Further Targets || 77
+NOTES: "Quick question for the room before I reveal this table: of these four completely independent clinical questions, which one would you guess fails worst at its hardest hospital? ... Take a guess. [Reveal:] Disease severity, at 70.7%. But look — three of the four show a real, double-digit-point failure. The size of each failure tracks how differently that specific measurement is distributed by hospital — this isn't one generic side effect of combining these four hospitals, it's a real, question-by-question signal."
+
+=== SLIDE 78 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Third question: resting-ECG result || Left: how the resting-ECG reading is distributed by hospital — normal readings dominate at Hungary and Switzerland, while the V.A. leans toward one specific abnormality. Right: the training-settled-down check, same as before, for this question. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 78
+NOTES: "This third question, resting ECG, turns out to be the closest analogue to our original disease-severity failure — 74.5% worst-hospital coverage, not far behind the 70.7% headline number. Keep that in mind, it lands in two slides."
+
+=== SLIDE 79 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Resting-ECG: calibration scores and per-diagnosis coverage || Left: the resting-ECG question's own calibration-score histogram. Right: coverage broken out by true resting-ECG reading. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 79
+NOTES: "Same diagnostic battery we've run twice already, now applied to resting ECG — for anyone who wants to check every angle rather than just trust the headline table."
+
+=== SLIDE 80 ===
+TEXT: PIPELINE — RESTING-ECG TASK || Resting-ECG: every hospital pair, and the headline test || Left: every hospital-pair combination for resting ECG — the V.A. is the hardest hospital to deploy at no matter which hospital set the threshold, landing 74-88% against the 90% promise. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 80
+NOTES: "Notice something here — the hardest hospital this time is the V.A., not Switzerland. Worth saying explicitly: the 'hardest hospital' isn't always the same one. It depends entirely on which specific measurement you're predicting."
+
+=== SLIDE 81 ===
+TEXT: PIPELINE — RESTING-ECG TASK || How long are the returned lists, by hospital? || Beyond Interoperability  ·  Pipeline — Resting-ECG Task || 81
+NOTES: "Completes the resting-ECG diagnostic set — same list-length chart as our earlier two questions."
+
+=== SLIDE 82 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Fourth question: exercise-induced chest pain || Left: how common exercise-induced chest pain is by hospital — roughly doubling from Hungary (30%) to the V.A. (65%), a milder version of the same kind of hospital-to-hospital swing seen for disease severity. Right: the training-settled-down check for this question. || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 82
+NOTES: "Our fourth and final question — exercise-induced chest pain, a simple yes-or-no answer. It automatically routes through a simpler two-outcome version of the model, but every check downstream — scoring rule, coverage, list length — works exactly the same as the other three questions."
+
+=== SLIDE 83 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Exercise angina: calibration scores and per-diagnosis coverage || Left: the exercise-angina question's own calibration-score histogram. Right: coverage broken out by true yes/no answer. || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 83
+NOTES: "Same diagnostic battery, one more time, applied to this yes/no question."
+
+=== SLIDE 84 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || Exercise angina: every hospital pair, and the headline test || Left: every hospital-pair combination for exercise angina — the weakest single pairing (threshold set at Hungary, deployed at Switzerland) lands at 83%, a real gap but a smaller one than resting ECG or disease severity showed. Right: a Cleveland-only threshold, tested at all four hospitals. || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 84
+NOTES: "The mildest of our four questions — 82.8% worst-hospital coverage. Still a genuine 7-point gap below our 90% promise, but noticeably smaller than resting ECG or disease severity."
+
+=== SLIDE 85 ===
+TEXT: PIPELINE — EXERCISE-ANGINA TASK || How long are the returned lists, by hospital? || Beyond Interoperability  ·  Pipeline — Exercise-Angina Task || 85
+NOTES: "That completes our fourth and final robustness check. Let's zoom all the way back out for a second: four completely different clinical questions, same pipeline, same basic story every single time. That's not a coincidence — that's the finding."
+
+=== SLIDE 86 ===
+TEXT: PIPELINE || Where this stands, and what's honestly still missing || ▪  For what it set out to do, yes — every claim on these slides is backed by a figure anyone can reproduce by running the notebooks, and ten automated tests confirm the underlying math is implemented correctly.
+▪  It correctly tells apart real population differences from measurement gaps, and it shows the coverage promise breaking concretely, with real numbers, not just in theory.
+▪  The finding holds up across two different clinical questions and two different scoring rules — it isn't a fluke of one particular choice.
+▪  What's honestly still missing: reliability charts that go a layer deeper than coverage alone, coverage checks broken out by patient subgroup (not just by hospital), a flag for “was this value filled in or actually measured,” a first real attempt at fixing the problem rather than just detecting it, a genuinely new fifth hospital never touched during development, and mapping this dataset onto a real clinical data standard. || Beyond Interoperability  ·  Pipeline || 86
+NOTES: "Let's be honest with each other about where this actually stands. For what it set out to do — yes. Every claim on these slides is backed by a figure any of you can reproduce, right now, by running these same notebooks, and ten automated tests confirm the underlying math is implemented correctly. It correctly tells apart real population differences from measurement gaps, it showed the coverage promise breaking with real numbers, and it held up across two different clinical questions and two different scoring rules.
+
+"But I want to be equally honest about what's still missing — deeper reliability checks, coverage broken out by patient subgroup and not just by hospital, a flag for whether a value was actually measured or just filled in, a real first attempt at fixing this rather than just detecting it, a genuinely new fifth hospital, and mapping this onto a real clinical data standard.
+
+"Let me open the floor here: if you were adapting this pipeline for your own hospital's data, which of these missing pieces would you tackle first?"
+
+=== SLIDE 87 ===
+TEXT: REFERENCES || Where these ideas come from || ▪  A. N. Angelopoulos & S. Bates. “Conformal Prediction: A Gentle Introduction.” FTML 16(4), 2023. — the main source behind Section 8's math, in a genuinely readable form.
+▪  Y. Romano, M. Sesia & E. Candès. “Classification with Valid and Adaptive Coverage.” NeurIPS 2020. — introduces the APS scoring rule used throughout this project.
+▪  H. B. McMahan et al. “Communication-Efficient Learning of Deep Networks from Decentralized Data.” AISTATS 2017. — introduces FedAvg, the training method built from scratch in notebook 03.
+▪  J. O. du Terrail et al. “FLamby: Datasets and Benchmarks for Cross-Silo Federated Learning.” 2022. — uses this same four-hospital population as a recognized benchmark.
+▪  R. Detrano et al. “International Application of a New Probability Algorithm for the Diagnosis of Coronary Artery Disease.” Am. J. Cardiology, 1989. — the original clinical study behind this dataset.
+▪  UCI Machine Learning Repository. “Heart Disease” dataset (ID 45). archive.ics.uci.edu/dataset/45/heart+disease. || Beyond Interoperability  ·  References || 87
+NOTES: "Quick pointer before we wrap up — if anyone wants to go deeper than we had time for today, start with Angelopoulos and Bates. It's written to be genuinely readable, no advanced statistics background assumed, and it's the source behind everything in Section 8."
+
+=== SLIDE 88 ===
+TEXT: Thank you || Questions & discussion
+fedconformal-clinical toolkit — Arnab Mukherjee
+Oklahoma State University — Center for Health Science, Tulsa || python scripts/run_end_to_end_pipeline.py && python scripts/run_chest_pain_pipeline.py && python scripts/run_exploratory_data_analysis.py
+NOTES: "Let's close the loop on where we started. Three ideas, remember? Interoperability — getting a patient's data out of one hospital's system and into a form another system can read. You saw today that solving that alone gets you nothing about whether the data can be trusted once it arrives.
+
+"Federated learning — several hospitals training one shared model together, without a single patient record ever leaving its own hospital. You built that yourselves this afternoon, in notebook 03, and saw it land within a point of the hypothetical pooled version on accuracy.
+
+"And conformal prediction — the piece that actually checks whether the shared model can be trusted somewhere new. You built that too, in notebook 02, and then watched its promise silently break, from 90% down to 70.7%, the moment we deployed at a hospital it had never seen. That's the whole workshop: interoperability gets you the data, federated learning gets you the model, and conformal prediction is what tells you whether to trust it.
+
+"If there's anything you didn't get to finish live, the exact reproduction command is on this slide, and the whole repository is yours to keep. Now — let's open it up. What questions do you have? [If the room is quiet, the 'what's honestly still missing' slide from the end of Section 9 is a good one to put back up and ask people to react to.] Thank you, everyone."

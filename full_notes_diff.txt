@@ -1,0 +1,174 @@
+===== SLIDE 1 =====
+--- MANUAL ---
+"Good morning, everyone, and welcome. My name is Arnab Mukherjee, I'm with the Center for Health Science at Oklahoma State University, and today we're going to spend the next few hours going Beyond Interoperability — building, by hand, the tools that tell us whether data moving between hospitals can actually be trusted once it gets there.
+
+"Here's how today is going to work. Roughly half of what we do will be me talking through ideas like this slide, and the other half will be hands-on — you, in a Jupyter notebook, running real code on real hospital data. We have eight notebooks, numbered 00 through 07, and I'll tell you exactly when to open each one as we go.
+
+"One thing I want to say clearly up front: you do not need a statistics background or a machine-learning background to follow today. Every idea — every formula, every acronym — gets explained before I show you the math. If at any point something sounds like jargon, stop me and ask.
+
+"Before we go any further — everyone, please open your terminal now and make sure you have the repository cloned and your Python environment set up, exactly as described in the README. Take two minutes, get that running, and give me a thumbs up when you're ready. We will not move on until everyone's environment works, because we're going to need it in about ten minutes."
+--- REGEN ---
+"Good morning, everyone, and welcome. My name is Arnab Mukherjee, I'm with the Center for Health Science at Oklahoma State University, and today we're going to spend the next few hours going Beyond Interoperability — building, by hand, the tools that tell us whether data moving between hospitals can actually be trusted once it gets there.
+
+"Here's how today is going to work. Roughly half of what we do will be me talking through ideas like this slide, and the other half will be hands-on — you, in a Jupyter notebook, running real code on real hospital data. We have eight notebooks, numbered 00 through 07, and I'll tell you exactly when to open each one as we go.
+
+"One thing I want to say clearly up front: you do not need a statistics background or a machine-learning background to follow today. Every idea — every formula, every acronym — gets explained in plain English before I show you the math. If at any point something sounds like jargon, stop me and ask.
+
+"Before we go any further — everyone, please open your terminal now and make sure you have the repository cloned and your Python environment set up, exactly as described in the README. Take two minutes, get that running, and give me a thumbs up when you're ready. We will not move on until everyone's environment works, because we're going to need it in about ten minutes."
+
+[Wait for the room. Once everyone confirms, move to the next slide.]
+
+===== SLIDE 2 =====
+--- MANUAL ---
+
+"There are three ideas we're going to build today. The first is interoperability — the ability to actually get a patient's data out of one hospital's computer system and into a form another system can read. The second is federated learning — a way for several hospitals to train one shared model together without a single patient record ever leaving its own hospital. And the third is conformal prediction — a way to check, with real numbers, whether that shared model can actually be trusted once you use it at a hospital it's never seen before.
+
+"Here's why you need all three, not just one. Interoperability gets the data moving, but it tells you nothing about whether you can trust it once it arrives. Federated learning lets you train across hospitals without needing to solve that trust question first — but it still doesn't tell you whether the result is safe to use. Conformal prediction is the piece that actually answers that — and it only has something to check because the first two ideas got us to a shared model in the first place. By the end of today, you will have built all three, yourself, in code.
+
+"Say this sentence with me, because we're coming back to it all day: getting data to move is not the same as being able to trust it once it arrives."
+--- REGEN ---
+"I want to give you the whole talk in one paragraph right now, because everything else today is just this paragraph, said again with more evidence.
+
+"There are three ideas we're going to build today. The first is interoperability — the ability to actually get a patient's data out of one hospital's computer system and into a form another system can read. The second is federated learning — a way for several hospitals to train one shared model together without a single patient record ever leaving its own hospital. And the third is conformal prediction — a way to check, with real numbers, whether that shared model can actually be trusted once you use it at a hospital it's never seen before.
+
+"Here's why you need all three, not just one. Interoperability gets the data moving, but it tells you nothing about whether you can trust it once it arrives. Federated learning lets you train across hospitals without needing to solve that trust question first — but it still doesn't tell you whether the result is safe to use. Conformal prediction is the piece that actually answers that — and it only has something to check because the first two ideas got us to a shared model in the first place. By the end of today, you will have built all three, yourself, in code.
+
+"Say this sentence with me, because we're coming back to it all day: getting data to move is not the same as being able to trust it once it arrives."
+
+===== SLIDE 4 =====
+--- MANUAL ---
+"This table is the map for the whole workshop — eight notebooks, 00 through 07, and I'll tell you exactly when to open each one. You'll build a conformal predictor on a simple model first, in about five lines of code, before we wrap that same idea around a more complicated federated model later, in notebook 04.
+
+"One more thing before we start: two of today's later results — the resting-ECG and exercise-angina findings in Section 9 — come from a standalone script, not a dedicated notebook. I'm telling you now so nobody goes looking for a notebook 08 that doesn't exist."
+--- REGEN ---
+"This table is your map for the whole day — eight notebooks, 00 through 07, and I'll tell you exactly when to open each one. Notice notebook 02, conformal basics, comes before notebook 03, federated training — that's deliberate. You'll build a conformal predictor on a simple model first, in about five lines of code, before we wrap that same idea around a more complicated federated model later, in notebook 04.
+
+"One more thing before we start: two of today's later results — the resting-ECG and exercise-angina findings in Section 9 — come from a standalone script, not a dedicated notebook. I'm telling you now so nobody goes looking for a notebook 08 that doesn't exist."
+
+===== SLIDE 5 =====
+--- MANUAL ---
+"Let's start with the first idea: interoperability. No notebook yet — this section is short, about five minutes — I just want to ask one question: data can already move between hospitals today, pretty easily. So why isn't that enough?"
+--- REGEN ---
+"Let's start with the first idea: interoperability. No notebook yet — this section is short, about five minutes — I just want to plant one question in your head and let it sit there: data can already move between hospitals today, pretty easily. So why isn't that enough?"
+
+===== SLIDE 6 =====
+--- MANUAL ---
+"Interoperability just means two systems can send each other data and both read it, without a person sitting in the middle translating by hand. Today, for the most part, that's a solved problem. Hospitals can send each other files, APIs exist, formats are standardized.
+
+"But here's what interoperability does not tell you: whether the data means the same thing once it arrives. Let me give you a concrete example. Two hospitals can both have a field called 'cholesterol.' Same column name, same units, same format. And they can still mean something completely different by it — because one hospital tests every single patient's cholesterol, and the other only orders the test when there's already a reason to suspect a problem. Same field, different meaning underneath.
+
+"Hold onto that example, because it's not hypothetical — in Section 5, I'm going to show you this exact gap, measured, in our own dataset: one of our four hospitals has zero recorded cholesterol readings, for every single patient. We'll come back to this."
+--- REGEN ---
+"Interoperability just means two computer systems can send each other data and both read it, without a person sitting in the middle translating by hand. Today, for the most part, that's a solved problem. Hospitals can send each other files, APIs exist, formats are standardized.
+
+"But here's what interoperability does not tell you: whether the data means the same thing once it arrives. Let me give you a concrete example. Two hospitals can both have a field called 'cholesterol.' Same column name, same units, same format. And they can still mean something completely different by it — because one hospital tests every single patient's cholesterol, and the other only orders the test when there's already a reason to suspect a problem. Same field, different meaning underneath.
+
+"Hold onto that example, because it's not hypothetical — in Section 5, I'm going to show you this exact gap, measured, in our own dataset: one of our four hospitals has zero recorded cholesterol readings, for every single patient. We'll come back to this."
+
+===== SLIDE 8 =====
+--- MANUAL ---
+"Everything you'll touch today is built from scratch, in plain NumPy — no imported conformal-prediction library, no imported federated-learning library. I did that on purpose, so that every single line is something you can read and understand, not a black box you have to trust because a package did it for you.
+
+"By the end of this workshop you'll have four real hospitals' data, trained one shared model across three of them without moving a single patient record, built a conformal predictor from scratch, and used it to catch that model failing at a fourth hospital it never saw. That's the whole workshop, in one sentence."
+--- REGEN ---
+"Everything you'll touch today is built from scratch, in plain NumPy — no imported conformal-prediction library, no imported federated-learning library. I did that on purpose, so that every single line is something you can read and understand, not a black box you have to trust because a package did it for you.
+
+"By the end of today you'll have loaded four real hospitals' data, trained one shared model across three of them without moving a single patient record, built a conformal predictor from scratch, and used it to catch that model failing at a fourth hospital it never saw. That's the whole day, in one sentence."
+
+===== SLIDE 9 =====
+--- MANUAL ---
+"Still no notebook yet — I want to spend a few minutes making sure you feel, why this is genuinely important, before we start building things in Section 5. Let's go through five things that make this problem tricky."
+--- REGEN ---
+"Still no notebook yet — I want to spend a few minutes making sure you feel, in your gut, why this is genuinely hard, before we start building things in Section 5. Let's go through five things that make this problem tricky."
+
+===== SLIDE 10 =====
+--- MANUAL ---
+"Let me walk through these five, because every one of them comes back later today, and I want you to recognize them when they do.
+
+"Number one and number two — telling real difference from measurement habit, and a model that fails silently — those two are exactly what conformal prediction, our third big idea, is built to solve. Number three — you can't just pool everyone's data — is exactly why federated learning, our second big idea, exists at all. Number four — same format doesn't mean same meaning — is what Section 6's tour of data standards is about. And number five — blended scorecards hide all of this — is why, for the rest of today, I am going to insist we look at results broken out by hospital, never just one blended average.
+
+"Remember these five numbers. We're going to answer every one of them by the end of the workshop."
+--- REGEN ---
+"Let me walk through these five, because every one of them comes back later today, and I want you to recognize them when they do.
+
+"Number one and number two — telling real difference from measurement habit, and a model that fails silently — those two are exactly what conformal prediction, our third big idea, is built to solve. Number three — you can't just pool everyone's data — is exactly why federated learning, our second big idea, exists at all. Number four — same format doesn't mean same meaning — is what Section 6's tour of data standards is about. And number five — blended scorecards hide all of this — is why, for the rest of today, I am going to insist we look at results broken out by hospital, never just one blended average.
+
+"Remember these five numbers. We're going to answer every one of them by the end of the day."
+
+===== SLIDE 11 =====
+--- MANUAL ---
+
+--- REGEN ---
+"One sentence for this whole section: this is a real, current problem, being actively legislated right now, not something I invented to fill a workshop slide."
+
+===== SLIDE 12 =====
+--- MANUAL ---
+"Two things are happening in parallel right now, out in the real world. First, AI models in medicine are being deployed faster than anyone is checking whether they hold up across hospitals — a model that looks great at the hospital where it was built regularly does worse somewhere else, and regulators have noticed: the FDA now expects tracking of real-world performance after a model launches, not just one clean number measured before.
+
+"Second — federated learning, our second big idea, has gone from a research curiosity to something close to a necessity. The method we're using today, called FedAvg, was introduced back in 2017, and you're going to build it yourself, from scratch, in notebook 03. In healthcare specifically, pooling every hospital's patient records into one place is often just not legally possible choice. And I'll add one more thing: a well-known 2022 benchmark collection called FLamby uses this exact same four-hospital dataset as its own standard test case.
+--- REGEN ---
+"Two things are happening in parallel right now, out in the real world. First, AI models in medicine are being deployed faster than anyone is checking whether they hold up across hospitals — a model that looks great at the hospital where it was built regularly does worse somewhere else, and regulators have noticed: the FDA now expects tracking of real-world performance after a model launches, not just one clean number measured before.
+
+"Second — federated learning, our second big idea, has gone from a research curiosity to something close to a necessity. The method we're using today, called FedAvg, was introduced back in 2017, and you're going to build it yourself, from scratch, in notebook 03 this afternoon. In healthcare specifically, pooling every hospital's patient records into one place is often just not legally possible — so this isn't a stylistic choice, it's close to the only option. And I'll add one more thing: a well-known 2022 benchmark collection called FLamby uses this exact same four-hospital dataset as its own standard test case. This isn't a toy problem I made up — it's a recognized testbed in the research community."
+
+===== SLIDE 13 =====
+--- MANUAL ---
+I want you to walk away with from this slide: today's regulations guarantee that health data CAN move between systems. Not one of them guarantees that the data means the same clinical fact once it gets there. That gap — the difference between 'can move' and 'can be trusted' — is exactly what our third idea, conformal prediction, exists to fill. It doesn't care what the data looks like, it doesn't care what kind of model you used, and it hands a reviewer a number they can go check for themselves, not something they have to take on faith. Sections 7 through 9 are entirely about that number."
+--- REGEN ---
+[Before presenting, double-check the current status of these regulations — both are live, evolving policy and timelines can shift.]
+
+"Here's the sentence I want you to walk away with from this slide: today's regulations guarantee that health data CAN move between systems. Not one of them guarantees that the data means the same clinical fact once it gets there. That gap — the difference between 'can move' and 'can be trusted' — is exactly what our third idea, conformal prediction, exists to fill. It doesn't care what the data looks like, it doesn't care what kind of model you used, and it hands a reviewer a number they can go check for themselves, not something they have to take on faith. Sections 7 through 9 are entirely about that number."
+
+===== SLIDE 14 =====
+--- MANUAL ---
+…
+
+"Read that slide with me: hospitals today can share data with each other. What's still missing is a checkable way to know whether that shared data can actually be trusted the same way once it arrives. That's the whole workshop, in one sentence."
+
+
+--- REGEN ---
+[Pause here. Let it sit in silence for a beat — this is the thesis statement for the entire day.]
+
+"Read that slide with me: hospitals today can share data with each other. What's still missing is a checkable way to know whether that shared data can actually be trusted the same way once it arrives. That's the whole workshop, in one sentence."
+
+[Now transition: "Let's talk about why getting real clinical data to even build this with was hard in the first place."]
+
+===== SLIDE 15 =====
+--- MANUAL ---
+
+--- REGEN ---
+"Some of you are probably already wondering: why is a workshop in this day and age using such a small, decades-old dataset instead of something bigger and more modern? Fair question — let me answer it properly before we start building. Still no notebook here yet."
+
+===== SLIDE 23 =====
+--- MANUAL ---
+"This table is the heart of the whole section, so let's slow down. Bottom row: a real difference between patient populations — that's biology. Top three rows: just differences in what each hospital happened to write down — that's measurement habit, not biology. Almost everything else in this section is evidence for one of these rows or the other.
+
+--- REGEN ---
+"This table is the heart of the whole section, so let's slow down. Bottom row: a real difference between patient populations — that's biology. Top three rows: just differences in what each hospital happened to write down — that's measurement habit, not biology. Almost everything else in this section is evidence for one of these rows or the other.
+
+"Let me ask you directly: which of these four rows would switching every hospital to the same shared data format actually fix? ... Take a second. The honest answer is none of them completely — a shared format fixes the container, not what people chose to fill it with. We'll come back to that exact question in Section 6."
+
+===== SLIDE 67 =====
+--- MANUAL ---
+"Training is done, model's frozen — nothing about it changes from here on. Now we add our third idea, conformal prediction, on top. Each training hospital's patients get split in half — one half sets the threshold, the other half is set aside purely to double-check it later. Neither half touched training.That cutoff — q-hat — is the one number left to 'fit' once the model itself is done. And it's only trustworthy for patients who look statistically like the ones it was set on. Let's go put that exact claim to the test."
+--- REGEN ---
+"Training is done, model's frozen — nothing about it changes from here on. Now we add our third idea, conformal prediction, on top. Each training hospital's patients get split in half — one half sets the threshold, the other half is set aside purely to double-check it later. Neither half touched training. That cutoff — q-hat — is the one number left to 'fit' once the model itself is done. And it's only trustworthy for patients who look statistically like the ones it was set on. Let's go put that exact claim to the test."
+
+===== SLIDE 86 =====
+--- MANUAL ---
+"Let's close the loop on where we started. Three ideas, remember? Interoperability — getting a patient's data out of one hospital's system and into a form another system can read. You saw today that solving that alone gets you nothing about whether the data can be trusted once it arrives.
+
+"Federated learning — several hospitals training one shared model together, without a single patient record ever leaving its own hospital. You built that yourselves this afternoon, in notebook 03, and saw it land within a point of the hypothetical pooled version on accuracy.
+
+"And conformal prediction — the piece that actually checks whether the shared model can be trusted somewhere new. You built that too, in notebook 02, and then watched its promise silently break, from 90% down to 70.7%, the moment we deployed at a hospital it had never seen. That's the whole workshop: interoperability gets you the data, federated learning gets you the model, and conformal prediction is what tells you whether to trust it.
+
+"If there's anything you didn't get to finish live, the exact reproduction command is on this slide, and the whole repository is yours to keep. Now — let's open it up. What questions do you have? [If the room is quiet, the 'what's honestly still missing' slide from the end of Section 9 is a good one to put back up and ask people to react to.] Thank you, everyone."
+--- REGEN ---
+"Let's close the loop on where we started. Three ideas, remember? Interoperability — getting a patient's data out of one hospital's system and into a form another system can read. You saw today that solving that alone gets you nothing about whether the data can be trusted once it arrives.
+
+"Federated learning — several hospitals training one shared model together, without a single patient record ever leaving its own hospital. You built that yourselves this afternoon, in notebook 03, and saw it land within a point of the hypothetical pooled version on accuracy.
+
+"And conformal prediction — the piece that actually checks whether the shared model can be trusted somewhere new. You built that too, in notebook 02, and then watched its promise silently break, from 90% down to 70.7%, the moment we deployed at a hospital it had never seen. That's the whole workshop: interoperability gets you the data, federated learning gets you the model, and conformal prediction is what tells you whether to trust it.
+
+"If there's anything you didn't get to finish live, the whole repository is yours to keep. Now — let's open it up. What questions do you have? [If the room is quiet, the 'what's honestly still missing' slide from the end of Section 9 is a good one to put back up and ask people to react to.] Thank you, everyone."
+
