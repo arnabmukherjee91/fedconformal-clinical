@@ -23,3 +23,6 @@ _extract/
 
 # Notebook execution scratch (keep committed figures in figures/)
 *.npy
+
+# Personal research notes (kept out of the workshop repo)
+Research/
